@@ -1,4 +1,3 @@
-LeadBot.NoNavMesh = false -- disable the nav mesh check
 LeadBot.TeamPlay = false -- don't hurt players on the bots team
 LeadBot.LerpAim = true -- interpolate aim (smooth aim)
 
