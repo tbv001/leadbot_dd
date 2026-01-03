@@ -64,17 +64,6 @@ function ENT:Health()
 	return nil
 end
 
-function ENT:CanSee(ply)
-	local pos = self:GetPos() + Vector(0, 0, 32)
-	local filter = {self}
-
-	if not pos then
-		return false
-	end
-
-	return util.QuickTrace(pos, (ply:GetPos() + Vector(0, 0, 32)) - pos, filter).Entity == ply
-end
-
 function ENT:RunBehaviour()
 	while (true) do
 		if self.PosGen then

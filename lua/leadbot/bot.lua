@@ -468,6 +468,21 @@ end
 
 local objective
 
+function LeadBot.CanSee(bot, target)
+    if not IsValid(bot) or not IsValid(target) then return false end
+
+    local botPos = bot:WorldSpaceCenter()
+    local targetPos = target:WorldSpaceCenter()
+
+    local tr = util.TraceLine({
+        start = botPos,
+        endpos = targetPos,
+        filter = {bot, bot.ControllerBot}
+    })
+
+    return tr.Entity == target
+end
+
 function LeadBot.PlayerMove(bot, cmd, mv)
     local controller = bot.ControllerBot
 
@@ -519,14 +534,14 @@ function LeadBot.PlayerMove(bot, cmd, mv)
                         filter = function(ent) return ent == ply end
                     })]]
 
-                    if ply:Alive() and controller:CanSee(ply) then
+                    if ply:Alive() and LeadBot.CanSee(bot, ply) then
                         controller.Target = ply
                         controller.ForgetTarget = CurTime() + 2
                     end
                 end
             end
         end
-    elseif controller.ForgetTarget < CurTime() and controller:CanSee(controller.Target) then
+    elseif controller.ForgetTarget < CurTime() and LeadBot.CanSee(bot, controller.Target) then
         controller.ForgetTarget = CurTime() + 2
     end
 
