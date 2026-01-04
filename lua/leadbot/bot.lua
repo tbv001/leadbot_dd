@@ -56,7 +56,6 @@ function LeadBot.AddBot()
         return
     end
 
-    local original_name
     local name = "Bot #" .. #player.GetBots() + 1
     local model = player_manager.TranslateToPlayerModelName(table.Random(player_manager.AllValidModels()))
     local botcolor = ColorRand()
@@ -72,7 +71,6 @@ function LeadBot.AddBot()
 
     bot.LeadBot_Config = {model, color, weaponcolor}
 
-    bot.OriginalName = original_name
     bot.ControllerBot = ents.Create("leadbot_navigator")
     bot.ControllerBot:Spawn()
     bot.ControllerBot:SetOwner(bot)
@@ -106,6 +104,7 @@ end
 
 function LeadBot.PlayerSpawn(bot)
     if !bot:IsBot() then return end
+    if not (Spells and Perks and Builds and Weapons) then return end
 
     local primaries = {}
     local secondaries = {}
@@ -178,7 +177,7 @@ function LeadBot.Think()
             end
 
             local wep = bot:GetActiveWeapon()
-            if IsValid(wep) then
+            if IsValid(wep) and wep.Primary then
                 local ammoty = wep:GetPrimaryAmmoType() or wep.Primary.Ammo
                 bot:SetAmmo(wep.Primary.DefaultClip, ammoty)
             end
@@ -209,7 +208,7 @@ function LeadBot.StartCommand(bot, cmd)
     end
 
     if IsValid(botWeapon) then
-        if not melee and (botWeapon:Clip1() == 0 or !IsValid(target) and botWeapon:Clip1() <= botWeapon:GetMaxClip1() / 2) then
+        if not melee and botWeapon:GetMaxClip1() > 0 and (botWeapon:Clip1() == 0 or !IsValid(target) and botWeapon:Clip1() <= botWeapon:GetMaxClip1() / 2) then
             buttons = buttons + IN_RELOAD
         end
 

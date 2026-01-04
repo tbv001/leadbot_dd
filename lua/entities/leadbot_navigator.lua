@@ -63,7 +63,7 @@ function ENT:IsNPC()
 end
 
 function ENT:Health()
-	return nil
+	return 0
 end
 
 function ENT:RunBehaviour()
