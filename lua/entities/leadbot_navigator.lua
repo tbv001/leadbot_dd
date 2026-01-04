@@ -31,7 +31,7 @@ end
 
 function ENT:ChasePos()
 	self.P = Path("Follow")
-	self.P:SetMinLookAheadDistance(10)
+	self.P:SetMinLookAheadDistance(300)
 	self.P:SetGoalTolerance(20)
 	self.P:Compute(self, self.PosGen)
 

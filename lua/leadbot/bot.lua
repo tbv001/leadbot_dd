@@ -42,8 +42,6 @@ concommand.Add("leadbot_kick", function(ply, _, args)
     end
 end, nil, "Kicks LeadBots (all is avaliable!)")
 
-CreateConVar("leadbot_strategy", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Enables the strategy system for newly created bots.")
-
 
 --[[ FUNCTIONS ]]--
 
@@ -65,7 +63,6 @@ function LeadBot.AddBot()
     local botweaponcolor = ColorRand()
     local color = Vector(botcolor.r / 255, botcolor.g / 255, botcolor.b / 255)
     local weaponcolor = Vector(botweaponcolor.r / 255, botweaponcolor.g / 255, botweaponcolor.b / 255)
-    local strategy = GetConVar("leadbot_strategy"):GetInt()
     local bot = player.CreateNextBot(name)
 
     if !IsValid(bot) then
@@ -73,9 +70,8 @@ function LeadBot.AddBot()
         return
     end
 
-    bot.LeadBot_Config = {model, color, weaponcolor, strategy}
+    bot.LeadBot_Config = {model, color, weaponcolor}
 
-    bot.BotStrategy = strategy
     bot.OriginalName = original_name
     bot.ControllerBot = ents.Create("leadbot_navigator")
     bot.ControllerBot:Spawn()
@@ -83,7 +79,7 @@ function LeadBot.AddBot()
     bot.LeadBot = true
     LeadBot.AddBotOverride(bot)
     LeadBot.AddBotControllerOverride(bot, bot.ControllerBot)
-    MsgN("[LeadBot] Bot " .. name .. " with strategy " .. bot.BotStrategy .. " added!")
+    MsgN("[LeadBot] Bot " .. name .. " added!")
 end
 
 function LeadBot.AddBotOverride(bot)
@@ -196,9 +192,6 @@ function LeadBot.Think()
     end
 end
 
-function LeadBot.PostPlayerDeath(bot)
-end
-
 function LeadBot.PlayerHurt(ply, att, hp, dmg)
     local controller = ply:GetController()
 
@@ -291,6 +284,10 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         controller = bot.ControllerBot
     end
 
+    -- Initialize combat state
+    if not controller.NextCombatMove then controller.NextCombatMove = 0 end
+    if not controller.CombatStrafeDir then controller.CombatStrafeDir = 0 end
+
     local wep = bot:GetActiveWeapon()
 
     -- Force a recompute
@@ -351,7 +348,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         end
     end
 
-    if !IsValid(controller.Target) and (!controller.PosGen or (gametype ~= "htf" and gametype ~= "koth" and bot:GetPos():DistToSqr(controller.PosGen) < 1000) or controller.LastSegmented < CurTime()) then
+    if not IsValid(controller.Target) and (not controller.PosGen or (gametype ~= "htf" and gametype ~= "koth" and bot:GetPos():DistToSqr(controller.PosGen) < 1000) or controller.LastSegmented < CurTime()) then
         if gametype == "htf" then
             if bot:IsCarryingFlag() then
                 controller.PosGen = controller:FindSpot("random", {radius = 12500})
@@ -393,17 +390,40 @@ function LeadBot.PlayerMove(bot, cmd, mv)
             controller.PosGen = controller:FindSpot("random", {radius = 12500})
             controller.LastSegmented = CurTime() + 10
         end
-    elseif IsValid(controller.Target) and ((gametype == "htf" and !bot:IsCarryingFlag()) or (gametype ~= "koth" and (bot:LBGetStrategy() ~= 1 or !melee)) or true) then
-        -- Move to our target
+    elseif IsValid(controller.Target) then
         local distance = controller.Target:GetPos():DistToSqr(bot:GetPos())
-        if controller.LastSegmented < CurTime() then
+
+        -- Move to our target
+        if gametype ~= "htf" or !bot:IsCarryingFlag() then
             controller.PosGen = controller.Target:GetPos()
             controller.LastSegmented = CurTime() + ((melee and math.Rand(0.7, 0.9)) or math.Rand(1.1, 1.3))
         end
 
-        -- Back up if the target is really close
-        if !melee and distance <= 90000 then
-            mv:SetForwardSpeed(-maxSpeed)
+        if !melee then
+            -- Back up if the target is really close
+            if distance <= 40000 then
+                mv:SetForwardSpeed(-maxSpeed)
+            end
+
+            -- Combat movement (strafing, jumping)
+            if controller.NextCombatMove < CurTime() then
+                controller.NextCombatMove = CurTime() + math.Rand(0.5, 1.5)
+
+                -- Random strafe
+                local r = math.random(3)
+                if r == 1 then controller.CombatStrafeDir = 1
+                elseif r == 2 then controller.CombatStrafeDir = -1
+                else controller.CombatStrafeDir = 0 end
+
+                -- Random jump
+                if math.random(5) == 1 then
+                    controller.NextJump = 0
+                end
+            end
+
+            if controller.CombatStrafeDir ~= 0 then
+                mv:SetSideSpeed(controller.CombatStrafeDir * maxSpeed)
+            end
         end
     end
 
@@ -442,7 +462,9 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         inobjective = IsValid(objective) and objective:GetPos():DistToSqr(controller:GetPos()) <= objective.radius2d
     end
 
-    if bot:GetVelocity():Length2DSqr() <= 225 and (gametype ~= "koth" or !inobjective) then
+    -- Stuck logic (Disabled if melee attacking)
+    local isMeleeAttacking = melee and IsValid(controller.Target) and controller.Target:GetPos():DistToSqr(bot:GetPos()) < 5000
+    if !isMeleeAttacking and bot:GetVelocity():Length2DSqr() <= 225 and (gametype ~= "koth" or !inobjective) then
         if controller.NextCenter < CurTime() then
             controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
             controller.NextCenter = CurTime() + math.Rand(0.3, 0.65)
@@ -539,12 +561,6 @@ hook.Add("StartCommand", "LeadBot_Control", function(bot, cmd)
     end
 end)
 
-hook.Add("PostPlayerDeath", "LeadBot_Death", function(bot)
-    if bot:IsLBot() then
-        LeadBot.PostPlayerDeath(bot)
-    end
-end)
-
 hook.Add("EntityTakeDamage", "LeadBot_Hurt", function(ply, dmgi)
     local att = dmgi:GetAttacker()
     local hp = ply:Health()
@@ -577,14 +593,6 @@ function player_meta.IsLBot(self, realbotsonly)
     end
 
     return self.LeadBot or false
-end
-
-function player_meta.LBGetStrategy(self)
-    if self.LeadBot_Config then
-        return self.LeadBot_Config[4]
-    else
-        return 0
-    end
 end
 
 function player_meta.LBGetModel(self)
