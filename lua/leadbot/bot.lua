@@ -1,11 +1,46 @@
+--[[ CONFIGURATION ]]--
+
 LeadBot.TeamPlay = false -- don't hurt players on the bots team
 LeadBot.LerpAim = true -- interpolate aim (smooth aim)
 
+
 --[[ COMMANDS ]]--
 
-concommand.Add("leadbot_add", function(ply, _, args) if IsValid(ply) and !ply:IsSuperAdmin() then return end local amount = 1 if tonumber(args[1]) then amount = tonumber(args[1]) end for i = 1, amount do timer.Simple(i * 0.1, function() LeadBot.AddBot() end) end end, nil, "Adds a LeadBot")
-concommand.Add("leadbot_kick", function(ply, _, args) if !args[1] or IsValid(ply) and !ply:IsSuperAdmin() then return end if args[1] ~= "all" then for k, v in pairs(player.GetBots()) do if string.find(v:GetName(), args[1]) then v:Kick() return end end else for k, v in pairs(player.GetBots()) do v:Kick() end end end, nil, "Kicks LeadBots (all is avaliable!)")
+concommand.Add("leadbot_add", function(ply, _, args)
+    if IsValid(ply) and not ply:IsSuperAdmin() then
+        return
+    end
+    local amount = 1
+    if tonumber(args[1]) then
+        amount = tonumber(args[1])
+    end
+    for i = 1, amount do
+        timer.Simple(i * 0.1, function()
+            LeadBot.AddBot()
+        end)
+    end
+end, nil, "Adds a LeadBot")
+
+concommand.Add("leadbot_kick", function(ply, _, args)
+    if not args[1] or IsValid(ply) and not ply:IsSuperAdmin() then
+        return
+    end
+    if args[1] ~= "all" then
+        for k, v in pairs(player.GetBots()) do
+            if string.find(v:GetName(), args[1]) then
+                v:Kick()
+                return
+            end
+        end
+    else
+        for k, v in pairs(player.GetBots()) do
+            v:Kick()
+        end
+    end
+end, nil, "Kicks LeadBots (all is avaliable!)")
+
 CreateConVar("leadbot_strategy", "1", {FCVAR_ARCHIVE, FCVAR_NOTIFY}, "Enables the strategy system for newly created bots.")
+
 
 --[[ FUNCTIONS ]]--
 
@@ -37,7 +72,6 @@ function LeadBot.AddBot()
 
     bot.LeadBot_Config = {model, color, weaponcolor, strategy}
 
-    -- for legacy purposes, will be removed soon when gamemodes are updated
     bot.BotStrategy = strategy
     bot.OriginalName = original_name
     bot.ControllerBot = ents.Create("leadbot_navigator")
@@ -66,7 +100,6 @@ function LeadBot.AddBotOverride(bot)
         end
     end
 
-    -- gamemode spawns us asap for some reason, let's try to override this and "pick our loadout"
     bot:KillSilent()
     bot:SetDeaths(0)
     bot:SetTeamColor()
@@ -96,7 +129,7 @@ function LeadBot.PlayerSpawn(bot)
 
     local primary, secondary = table.Random(primaries), table.Random(secondaries)
 
-    -- melee only person
+    -- Melee only build
     if math.random(5) == 1 then
         primary = "none"
         build = Builds[table.Random({"healthy", "agile"})]
@@ -239,15 +272,10 @@ function LeadBot.StartCommand(bot, cmd)
         buttons = buttons + IN_JUMP
     end
 
-    --[[if controller.MovingBack and math.random(6) == 1 then
-        buttons = buttons + IN_USE
-    end]]
-
     if !bot:IsOnGround() and controller.NextJump > CurTime() then
         buttons = buttons + IN_DUCK
     end
 
-    -- bot:SelectWeapon((IsValid(controller.Target) and controller.Target:GetPos():DistToSqr(controller:GetPos()) < 129000 and "weapon_shotgun") or "weapon_smg1")
     cmd:ClearButtons()
     cmd:ClearMovement()
     cmd:SetButtons(buttons)
@@ -258,8 +286,8 @@ local objective
 function LeadBot.CanSee(bot, target)
     if not IsValid(bot) or not IsValid(target) then return false end
 
-    local botPos = bot:WorldSpaceCenter()
-    local targetPos = target:WorldSpaceCenter()
+    local botPos = bot:EyePos()
+    local targetPos = target:EyePos()
 
     local tr = util.TraceLine({
         start = botPos,
@@ -282,10 +310,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
 
     local wep = bot:GetActiveWeapon()
 
-    --[[local min, max = controller:GetModelBounds()
-    debugoverlay.Box(controller:GetPos(), min, max, 0.1, Color(255, 0, 0, 0), true)]]
-
-    -- force a recompute
+    -- Force a recompute
     if controller.PosGen and controller.P and controller.TPos ~= controller.PosGen then
         controller.TPos = controller.PosGen
         controller.P:Compute(controller, controller.PosGen)
@@ -314,13 +339,6 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         else
             for _, ply in player.Iterator() do
                 if ply ~= bot and ((ply:IsPlayer() and (!LeadBot.TeamPlay or (LeadBot.TeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(bot:GetPos()) < 2250000 then
-                    --[[local targetpos = ply:EyePos() - Vector(0, 0, 10)
-                    local trace = util.TraceLine({
-                        start = bot:GetShootPos(),
-                        endpos = targetpos,
-                        filter = function(ent) return ent == ply end
-                    })]]
-
                     if ply:Alive() and LeadBot.CanSee(bot, ply) then
                         controller.Target = ply
                         controller.ForgetTarget = CurTime() + 2
@@ -339,8 +357,6 @@ function LeadBot.PlayerMove(bot, cmd, mv)
             dt.Entity:Fire("OpenAwayFrom", bot, 0)
         end
     end
-
-    -- controller.MovingBack = false
 
     if !IsValid(controller.Target) and (!controller.PosGen or (gametype ~= "htf" and gametype ~= "koth" and bot:GetPos():DistToSqr(controller.PosGen) < 1000) or controller.LastSegmented < CurTime()) then
         if gametype == "htf" then
@@ -380,28 +396,24 @@ function LeadBot.PlayerMove(bot, cmd, mv)
             controller.PosGen = point_pos + Vector(rand.x, rand.y, 0)
             controller.LastSegmented = CurTime() + math.random(3, 6)
         else
-            -- find a random spot on the map, and in 10 seconds do it again!
+            -- Find a random spot on the map, and in 10 seconds do it again!
             controller.PosGen = controller:FindSpot("random", {radius = 12500})
             controller.LastSegmented = CurTime() + 10
         end
     elseif IsValid(controller.Target) and ((gametype == "htf" and !bot:IsCarryingFlag()) or (gametype ~= "koth" and (bot:LBGetStrategy() ~= 1 or !melee)) or true) then
-        -- move to our target
+        -- Move to our target
         local distance = controller.Target:GetPos():DistToSqr(bot:GetPos())
         if controller.LastSegmented < CurTime() then
             controller.PosGen = controller.Target:GetPos()
             controller.LastSegmented = CurTime() + ((melee and math.Rand(0.7, 0.9)) or math.Rand(1.1, 1.3))
         end
 
-        -- back up if the target is really close
-        -- TODO: find a random spot rather than trying to back up into what could just be a wall
-        -- something like controller.PosGen = controller:FindSpot("random", {pos = bot:GetPos() - bot:GetForward() * 350, radius = 1000})?
+        -- Back up if the target is really close
         if !melee and distance <= 90000 then
-            -- controller.MovingBack = true
             mv:SetForwardSpeed(-1200)
         end
     end
 
-    -- movement also has a similar issue, but it's more severe...
     if !controller.P then
         return
     end
@@ -413,13 +425,13 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     local cur_segment = controller.cur_segment
     local curgoal = segments[cur_segment]
 
-    -- got nowhere to go, why keep moving?
+    -- Got nowhere to go, why keep moving?
     if !curgoal then
         mv:SetForwardSpeed(0)
         return
     end
 
-    -- think every step of the way!
+    -- Think every step of the way!
     if segments[cur_segment + 1] and Vector(bot:GetPos().x, bot:GetPos().y, 0):DistToSqr(Vector(curgoal.pos.x, curgoal.pos.y)) < 100 then
         controller.cur_segment = controller.cur_segment + 1
         curgoal = segments[controller.cur_segment]
@@ -440,9 +452,6 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     if bot:GetVelocity():Length2DSqr() <= 225 and (gametype ~= "koth" or !inobjective) then
         if controller.NextCenter < CurTime() then
             controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
-            -- curgoal.pos = curgoal.area:GetCenter()
-            -- goalpos = segments[controller.cur_segment - 1].area:GetCenter()
-
             controller.NextCenter = CurTime() + math.Rand(0.3, 0.65)
         elseif controller.nextStuckJump < CurTime() then
             if !bot:Crouching() then
@@ -462,12 +471,12 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         end
     end
 
-    -- jump
+    -- Jump
     if controller.NextJump ~= 0 and curgoal.type > 1 and controller.NextJump < CurTime() then
         controller.NextJump = 0
     end
 
-    -- duck
+    -- Duck
     if curgoal.area:GetAttributes() == NAV_MESH_CROUCH then
         controller.NextDuck = CurTime() + 0.1
     end
@@ -478,7 +487,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         controller.P:Draw()
     end
 
-    -- eyesight
+    -- Eyesight
     local lerp = FrameTime() * math.random(8, 10)
     local lerpc = FrameTime() * 8
 
@@ -493,8 +502,6 @@ function LeadBot.PlayerMove(bot, cmd, mv)
 
     if IsValid(controller.Target) then
         local targetpos = controller.Target:EyePos()
-        -- targetpos.z = math.random(controller.Target:GetPos().z, targetpos.z)
-        -- targetpos = targetpos + VectorRand() * 64
 
         bot:SetEyeAngles(LerpAngle(lerp, bot:EyeAngles(), (targetpos - bot:GetShootPos()):Angle()))
         return
@@ -517,6 +524,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         end
     end
 end
+
 
 --[[ HOOKS ]]--
 
@@ -564,6 +572,7 @@ hook.Add("PlayerSpawn", "LeadBot_Spawn", function(bot)
     end
 end)
 
+
 --[[ META ]]--
 
 local player_meta = FindMetaTable("Player")
@@ -608,11 +617,11 @@ end
 function player_meta.GetInfo(self, convar)
     if self:IsBot() and self:IsLBot() then
         if convar == "cl_playermodel" then
-            return self:LBGetModel() --self.LeadBot_Config[1]
+            return self:LBGetModel()
         elseif convar == "cl_playercolor" then
-            return self:LBGetColor() --self.LeadBot_Config[2]
+            return self:LBGetColor()
         elseif convar == "cl_weaponcolor" then
-            return self:LBGetColor(true) --self.LeadBot_Config[3]
+            return self:LBGetColor(true)
         else
             return ""
         end
