@@ -1,3 +1,5 @@
+include("leadbot/shared.lua")
+
 --[[ CONFIGURATION ]]--
 
 LeadBot.TeamPlay = false -- don't hurt players on the bots team
@@ -240,7 +242,7 @@ function LeadBot.GetVisibleHitbox(bot, target, ignore)
 end
 
 function LeadBot.StartCommand(bot, cmd)
-    local buttons = 0
+    local buttons = IN_SPEED
     local botWeapon = bot:GetActiveWeapon()
     local melee = IsValid(botWeapon) and botWeapon.Base == "dd_meleebase"
     local controller = bot.ControllerBot
@@ -248,8 +250,12 @@ function LeadBot.StartCommand(bot, cmd)
 
     if !IsValid(controller) then return end
 
-    if not IsValid(target) or melee then
-        buttons = buttons + IN_SPEED
+    if ((controller.NextSlideTime < CurTime() and math.random(5) == 1) or controller.CurSlideTime > CurTime()) and RunningCheck(bot) then
+        if controller.CurSlideTime < CurTime() then
+            controller.CurSlideTime = CurTime() + 1
+        end
+        buttons = buttons + IN_DUCK
+        controller.NextSlideTime = CurTime() + math.random(4, 10)
     end
 
     if IsValid(botWeapon) then
@@ -272,12 +278,22 @@ function LeadBot.StartCommand(bot, cmd)
                 controller.NextAttack2Delay = CurTime() + 5
             end
 
-            if aimVec:Dot(targetDir) > 0.9 and controller.NextAttack < CurTime() and ((melee and bot:GetPos():DistToSqr(target:GetPos()) < 10000) or not melee) then
-                buttons = buttons + IN_ATTACK + (not bot:IsThug() and botWeapon:GetClass() ~= "dd_striker" and controller.NextAttack2 > CurTime() and IN_ATTACK2 or 0)
-                if botWeapon:GetClass() ~= "dd_striker" then
-                    controller.NextAttack = CurTime() + 0.05
+            if aimVec:Dot(targetDir) > 0.9 and controller.NextAttack < CurTime() and controller.ShootReactionTime < CurTime() then
+                if melee and bot:GetPos():DistToSqr(target:GetPos()) < 10000 or not melee then
+                    buttons = buttons + IN_ATTACK + (not bot:IsThug() and botWeapon:GetClass() ~= "dd_striker" and controller.NextAttack2 > CurTime() and IN_ATTACK2 or 0)
+
+                    if botWeapon:GetClass() ~= "dd_striker" then
+                        controller.NextAttack = CurTime() + 0.05
+                    end
+                end
+
+                if controller.NextDiveTime < CurTime() and math.random(5) == 1 then
+                    controller.NextDiveTime = CurTime() + math.random(4, 10)
+                    bot:Dive()
                 end
             end
+        else
+            controller.ShootReactionTime = CurTime() + math.random(0.25, 0.45)
         end
     end
 
@@ -318,7 +334,7 @@ end
 
 function LeadBot.PlayerMove(bot, cmd, mv)
     local controller = bot.ControllerBot
-    local maxSpeed = mv:GetMaxSpeed() or 1500
+    local maxSpeed = 9999 --mv:GetMaxSpeed() or 1500
     local inobjective = false
     local visibleTargetPos
 
@@ -637,6 +653,8 @@ end)
 hook.Add("PostCleanupMap", "LeadBot_PostClean_Init", function()
     LeadBot.Init()
 end)
+
+hook.Add("CalcMainActivity", "LeadBot_ActivityServer", CalcMainActivityBots)
 
 
 --[[ META ]]--

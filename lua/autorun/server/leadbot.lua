@@ -1,3 +1,5 @@
+AddCSLuaFile("leadbot/shared.lua")
+
 if game.SinglePlayer() or engine.ActiveGamemode() ~= "darkestdays" then return end
 
 LeadBot = {}

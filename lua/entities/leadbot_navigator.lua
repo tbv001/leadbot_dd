@@ -31,6 +31,10 @@ function ENT:Initialize()
 	self.NextAttack2Delay = 0
 	self.NextChangeSpell = 0
 	self.NextLadderJump = 0
+	self.NextDiveTime = 0
+	self.ShootReactionTime = 0
+	self.NextSlideTime = 0
+	self.CurSlideTime = 0
 
 	if LeadBot.AddControllerOverride then
 		LeadBot.AddControllerOverride(self)
