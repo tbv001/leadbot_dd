@@ -186,6 +186,10 @@ function LeadBot.Think()
 end
 
 function LeadBot.PlayerHurt(ply, att, hp, dmg)
+    if not IsValid(ply) or not IsValid(att) then
+        return
+    end
+
     local controller = ply:GetController()
 
     if not IsValid(controller.Target) and (LeadBot.TeamPlay and (ply:Team() ~= att:Team()) or not LeadBot.TeamPlay) then
