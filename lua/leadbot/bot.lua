@@ -250,7 +250,7 @@ function LeadBot.StartCommand(bot, cmd)
 
     if !IsValid(controller) then return end
 
-    if controller.NextAttack2 > CurTime() then
+    if controller.NextAttack2 < CurTime() then
         buttons = buttons + IN_SPEED
     end
 
