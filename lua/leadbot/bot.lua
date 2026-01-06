@@ -196,7 +196,7 @@ function LeadBot.PlayerDeath(bot, inflictor, attacker)
     if not bot:IsBot() then return end
 
     for _, ent in ents.Iterator() do
-        if ent:GetClass() == "npc_grenade_frag" and ent:GetSaveTable().m_hThrower == bot then
+        if IsValid(ent) and ent:GetClass() == "npc_grenade_frag" and ent:GetSaveTable().m_hThrower == bot then
             ent:Remove()
         end
     end
@@ -245,7 +245,7 @@ function LeadBot.IsObjectVisible(bot, obj, objClass, ignore)
     if not IsValid(obj) or not IsValid(bot) then return nil end
 
     local tr = util.TraceLine({
-        start = bot:EyePos(),
+        start = bot:WorldSpaceCenter() + Vector(0, 0, 24),
         endpos = obj:WorldSpaceCenter(),
         filter = ignore,
         mask = MASK_SHOT
@@ -278,7 +278,7 @@ function LeadBot.IsTargetVisible(bot, target, ignore)
             local pos = target:GetBonePosition(bone)
             if pos then
                 local tr = util.TraceLine({
-                    start = bot:EyePos(),
+                    start = bot:WorldSpaceCenter() + Vector(0, 0, 24),
                     endpos = pos,
                     filter = ignore,
                     mask = MASK_SHOT
@@ -523,7 +523,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     end
 
     if door_enabled then
-        local dt = util.QuickTrace(bot:EyePos(), bot:GetForward() * 45, bot)
+        local dt = util.QuickTrace(bot:WorldSpaceCenter() + Vector(0, 0, 24), bot:GetForward() * 45, bot)
 
         if IsValid(dt.Entity) and dt.Entity:GetClass() == "prop_door_rotating" then
             dt.Entity:Fire("OpenAwayFrom", bot, 0)

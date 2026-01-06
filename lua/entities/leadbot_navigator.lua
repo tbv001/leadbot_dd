@@ -80,9 +80,10 @@ end
 function ENT:RunBehaviour()
 	while (true) do
 		if self.PosGen then
-			self:ChasePos({})
+			self:ChasePos()
 		end
 
+		coroutine.wait(1)
 		coroutine.yield()
 	end
 end
