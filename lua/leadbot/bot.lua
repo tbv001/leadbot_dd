@@ -2,13 +2,11 @@ include("leadbot/shared.lua")
 
 --[[ CONFIGURATION ]]--
 
-LeadBot.TeamPlay = false -- don't hurt players on the bots team
-LeadBot.LerpAim = true -- interpolate aim (smooth aim)
-
+local isTeamPlay = false
+local entityLoaded = false
 local objective
 local gametype
 local door_enabled
-local entityLoaded = false
 
 --[[ COMMANDS ]]--
 
@@ -45,6 +43,37 @@ concommand.Add("leadbot_kick", function(ply, _, args)
     end
 end, nil, "Kicks LeadBots (all is avaliable!)")
 
+concommand.Add("leadbot_generatenavmesh", function(ply, _, args)
+    if not GetConVar("sv_cheats"):GetBool() then
+        MsgN("[LeadBot] sv_cheats must be enabled to generate a navmesh!\n")
+        return
+    end
+
+    if IsValid(ply) and not ply:IsSuperAdmin() then
+        return
+    end
+
+    if navmesh.IsGenerating() then
+        MsgN("[LeadBot] Navmesh generation is already in progress!\n")
+        return
+    end
+
+    GetConVar("nav_slope_limit"):SetFloat(0.55)
+    GetConVar("nav_max_view_distance"):SetInt(1)
+    GetConVar("nav_quicksave"):SetInt(2)
+
+    local traceLine = util.TraceLine({
+        start = ply:GetPos(),
+        endpos = ply:GetPos() - Vector(0, 0, 16384),
+        mask = MASK_PLAYERSOLID_BRUSHONLY
+    })
+
+    navmesh.AddWalkableSeed(traceLine.HitPos, traceLine.HitNormal)
+    navmesh.BeginGeneration()
+
+    MsgN("[LeadBot] Navmesh generation started!\n")
+end, nil, "Generate a cheap navmesh")
+
 
 --[[ FUNCTIONS ]]--
 
@@ -54,7 +83,7 @@ function LeadBot.AddBot()
     end
 
     if !navmesh.IsLoaded() then
-        MsgN("There is no navmesh! Generate one using \"nav_generate\"!\n")
+        MsgN("There is no navmesh! Generate one using \"leadbot_generatenavmesh\"!")
         return
     end
 
@@ -163,7 +192,7 @@ function LeadBot.PlayerSpawn(bot)
 end
 
 function LeadBot.Init()
-    LeadBot.TeamPlay = GAMEMODE:GetGametype() ~= "ffa"
+    isTeamPlay = GAMEMODE:GetGametype() ~= "ffa"
     gametype = GAMEMODE:GetGametype()
 
     if ents.FindByClass("prop_door_rotating")[1] then
@@ -207,7 +236,7 @@ function LeadBot.PlayerHurt(ply, att, hp, dmg)
         return
     end
 
-    if LeadBot.TeamPlay and ply.Team and att.Team and (ply:Team() == att:Team()) then
+    if isTeamPlay and ply.Team and att.Team and (ply:Team() == att:Team()) then
         return
     end
 
@@ -245,7 +274,7 @@ function LeadBot.IsObjectVisible(bot, obj, objClass, ignore)
     if not IsValid(obj) or not IsValid(bot) then return nil end
 
     local tr = util.TraceLine({
-        start = bot:WorldSpaceCenter() + Vector(0, 0, 24),
+        start = bot:EyePos(),
         endpos = obj:WorldSpaceCenter(),
         filter = ignore,
         mask = MASK_SHOT
@@ -278,7 +307,7 @@ function LeadBot.IsTargetVisible(bot, target, ignore)
             local pos = target:GetBonePosition(bone)
             if pos then
                 local tr = util.TraceLine({
-                    start = bot:WorldSpaceCenter() + Vector(0, 0, 24),
+                    start = bot:EyePos(),
                     endpos = pos,
                     filter = ignore,
                     mask = MASK_SHOT
@@ -329,7 +358,7 @@ function LeadBot.ThrowNade(bot)
 		ent:Activate()
 		ent:Spawn()
 		ent:SetSaveValue("m_hThrower", bot )
-		local col = team.GetColor(bot:Team())
+		local col = team.GetColor(bot:Team()) or Color(255, 255, 255)
 		col.a = 255
 		
 		ent:SetMaterial("models/shiny")
@@ -496,7 +525,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         local botPos = bot:GetPos()
 
         for _, ply in player.Iterator() do
-            if ply ~= bot and ((ply:IsPlayer() and (!LeadBot.TeamPlay or (LeadBot.TeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(botPos) < 2250000 then
+            if ply ~= bot and ((ply:IsPlayer() and (!isTeamPlay or (isTeamPlay and (ply:Team() ~= bot:Team())))) or ply:IsNPC()) and ply:GetPos():DistToSqr(botPos) < 2250000 then
                 if ply:Alive() then
                     table.insert(targets, ply)
                 end
@@ -523,7 +552,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     end
 
     if door_enabled then
-        local dt = util.QuickTrace(bot:WorldSpaceCenter() + Vector(0, 0, 24), bot:GetForward() * 45, bot)
+        local dt = util.QuickTrace(bot:EyePos(), bot:GetForward() * 45, bot)
 
         if IsValid(dt.Entity) and dt.Entity:GetClass() == "prop_door_rotating" then
             dt.Entity:Fire("OpenAwayFrom", bot, 0)
@@ -692,11 +721,6 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     -- Eyesight
     local lerp = FrameTime() * 16
     local lerpc = FrameTime() * 8
-
-    if !LeadBot.LerpAim then
-        lerp = 1
-        lerpc = 1
-    end
 
     local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
 
