@@ -4,6 +4,7 @@ include("leadbot/shared.lua")
 
 local isTeamPlay = false
 local entityLoaded = false
+local difficulty = 0
 local objective
 local gametype
 local door_enabled
@@ -45,7 +46,7 @@ end, nil, "Kicks LeadBots (all is avaliable!)")
 
 concommand.Add("leadbot_generatenavmesh", function(ply, _, args)
     if not GetConVar("sv_cheats"):GetBool() then
-        MsgN("[LeadBot] sv_cheats must be enabled to generate a navmesh!\n")
+        MsgN("[LeadBot] sv_cheats must be enabled to generate a navmesh!")
         return
     end
 
@@ -54,25 +55,18 @@ concommand.Add("leadbot_generatenavmesh", function(ply, _, args)
     end
 
     if navmesh.IsGenerating() then
-        MsgN("[LeadBot] Navmesh generation is already in progress!\n")
+        MsgN("[LeadBot] Navmesh generation is already in progress!")
         return
     end
 
-    GetConVar("nav_slope_limit"):SetFloat(0.55)
-    GetConVar("nav_max_view_distance"):SetInt(1)
-    GetConVar("nav_quicksave"):SetInt(2)
-
-    local traceLine = util.TraceLine({
-        start = ply:GetPos(),
-        endpos = ply:GetPos() - Vector(0, 0, 16384),
-        mask = MASK_PLAYERSOLID_BRUSHONLY
-    })
-
-    navmesh.AddWalkableSeed(traceLine.HitPos, traceLine.HitNormal)
-    navmesh.BeginGeneration()
-
-    MsgN("[LeadBot] Navmesh generation started!\n")
+    ply:ConCommand("nav_slope_limit 0.55")
+    ply:ConCommand("nav_max_view_distance 1")
+    ply:ConCommand("nav_quicksave 2")
+    ply:ConCommand("nav_mark_walkable")
+    ply:ConCommand("nav_generate")
 end, nil, "Generate a cheap navmesh")
+
+CreateConVar("leadbot_difficulty", "0", {FCVAR_ARCHIVE}, "Sets the LeadBot difficulty (0 = Easy, 1 = Medium, 2 = Hard)")
 
 
 --[[ FUNCTIONS ]]--
@@ -194,6 +188,7 @@ end
 function LeadBot.Init()
     isTeamPlay = GAMEMODE:GetGametype() ~= "ffa"
     gametype = GAMEMODE:GetGametype()
+    difficulty = math.Clamp(GetConVar("leadbot_difficulty"):GetInt() or 0, 0, 2)
 
     if ents.FindByClass("prop_door_rotating")[1] then
         door_enabled = true
@@ -382,6 +377,15 @@ function LeadBot.ThrowNade(bot)
 	end
 end
 
+function LeadBot.FindRandomSpot(bot)
+    if not IsValid(bot) then return end
+
+    local randomPosList = navmesh.Find(bot:GetPos(), 12500, 18, 72)
+    local pos = randomPosList[math.random(1, #randomPosList)]:GetRandomPoint()
+
+    return pos or bot:GetPos()
+end
+
 function LeadBot.StartCommand(bot, cmd)
     local controller = bot.ControllerBot
     if !IsValid(controller) then return end
@@ -391,6 +395,7 @@ function LeadBot.StartCommand(bot, cmd)
     local melee = IsValid(botWeapon) and botWeapon.Base == "dd_meleebase"
     local target = controller.Target
     local aboutToThrowNade = controller.NextNadeThrowTime < CurTime() and math.random(5) == 1 and not melee and not bot:IsThug()
+    local isTargetVisible = IsValid(target) and LeadBot.IsTargetVisible(bot, target, {bot, controller})
 
     -- Sprint when not casting spells and not about to throw nade
     if controller.NextAttack2 < CurTime() and not aboutToThrowNade then
@@ -427,7 +432,7 @@ function LeadBot.StartCommand(bot, cmd)
                 controller.NextAttack2Delay = CurTime() + 5
             end
 
-            if aimVec:Dot(targetDir) > 0.9 and controller.NextAttack < CurTime() and controller.ShootReactionTime < CurTime() then
+            if aimVec:Dot(targetDir) > 0.9 and controller.NextAttack < CurTime() and controller.ShootReactionTime < CurTime() and (isTargetVisible or botWeapon:GetClass() == "dd_striker") then
                 if melee and bot:GetPos():DistToSqr(target:GetPos()) < 10000 or not melee then
                     buttons = buttons + IN_ATTACK + (not bot:IsThug() and botWeapon:GetClass() ~= "dd_striker" and not aboutToThrowNade and controller.NextAttack2 > CurTime() and IN_ATTACK2 or 0)
 
@@ -449,7 +454,7 @@ function LeadBot.StartCommand(bot, cmd)
                 end
             end
         else
-            controller.ShootReactionTime = CurTime() + math.random(0.25, 0.45)
+            controller.ShootReactionTime = CurTime() + math.random(0.25, 1)
         end
     end
 
@@ -570,7 +575,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     if not IsValid(controller.Target) and (not controller.PosGen or (gametype ~= "htf" and gametype ~= "koth" and bot:GetPos():DistToSqr(controller.PosGen) < 1000) or controller.LastSegmented < CurTime()) then
         if gametype == "htf" then
             if bot:IsCarryingFlag() then
-                controller.PosGen = controller:FindSpot("random", {radius = 12500})
+                controller.PosGen = LeadBot.FindRandomSpot(bot)
                 controller.LastSegmented = CurTime() + 8
             else
                 if !IsValid(objective) then
@@ -610,7 +615,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
             end
         else
             -- Find a random spot on the map, and in 10 seconds do it again!
-            controller.PosGen = controller:FindSpot("random", {radius = 12500})
+            controller.PosGen = LeadBot.FindRandomSpot(bot)
             controller.LastSegmented = CurTime() + 10
         end
     elseif IsValid(controller.Target) then
@@ -719,7 +724,7 @@ function LeadBot.PlayerMove(bot, cmd, mv)
     end
 
     -- Eyesight
-    local lerp = FrameTime() * 16
+    local lerp = FrameTime() * (8 + (8 * difficulty))
     local lerpc = FrameTime() * 8
 
     local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
@@ -730,12 +735,14 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         visibleTargetPos = LeadBot.IsTargetVisible(bot, controller.Target, {bot, controller})
     end
 
-    if IsValid(controller.Target) and visibleTargetPos then
+    if IsValid(controller.Target) and (melee and visibleTargetPos or not melee) then
         if gametype == "koth" and inobjective and not melee then
             mv:SetForwardSpeed(0)
         end
 
-        bot:SetEyeAngles(LerpAngle(lerp, bot:EyeAngles(), (visibleTargetPos - bot:GetShootPos()):Angle()))
+        local aimAtPos = visibleTargetPos or controller.Target:WorldSpaceCenter()
+
+        bot:SetEyeAngles(LerpAngle(lerp, bot:EyeAngles(), (aimAtPos - bot:GetShootPos()):Angle()))
     else
         if gametype == "koth" and inobjective then
             mv:SetForwardSpeed(0)
@@ -755,6 +762,11 @@ function LeadBot.PlayerMove(bot, cmd, mv)
         end
     end
 end
+
+-- [[ CONVAR CHANGE CALLBACKS ]]--
+cvars.AddChangeCallback("leadbot_difficulty", function(convar_name, value_old, value_new)
+    difficulty = math.Clamp(tonumber(value_new) or 0, 0, 2)
+end)
 
 
 --[[ HOOKS ]]--
