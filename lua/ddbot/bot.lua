@@ -74,7 +74,11 @@ concommand.Add("dd_bot_generatenavmesh", function(ply, _, args)
     ply:ConCommand("nav_slope_limit 0.55")
     ply:ConCommand("nav_max_view_distance 1")
     ply:ConCommand("nav_quicksave 2")
-    ply:ConCommand("nav_mark_walkable")
+
+    if ply:Alive() then
+        ply:ConCommand("nav_mark_walkable")
+    end
+
     ply:ConCommand("nav_generate")
 end, nil, "Generates a cheap navmesh, requires sv_cheats 1")
 
