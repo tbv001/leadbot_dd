@@ -1,6 +1,6 @@
 # Darkest Days Bots
 
-An addon for Garry's Mod that aims to provide challenging and life-like AI opponents for the Darkest Days game mode. Originally a LeadBot fork, after heavy refactoring and customisation, it has become a standalone project.
+An addon for Garry's Mod that aims to provide challenging and life-like AI opponents for the Darkest Days game mode. Originally a LeadBot fork, after heavy refactoring and customization, it has become a standalone project.
 
 ## Installation
 
