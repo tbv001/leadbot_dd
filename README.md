@@ -1,14 +1,32 @@
-# leadbot_dd
+# Darkest Days Bots
 
-A leadbot fork with fixes and edits specifically for Darkest Days gamemode.
+An addon for Garry's Mod that aims to provide challenging and life-like AI opponents for the Darkest Days gamemode. Originally a LeadBot fork, but after heavy refactoring and customisation, it has become a standalone project.
 
-### Installation
+## Installation
 
-Download LeadBot from [here](https://github.com/tbv001/leadbot_dd/archive/refs/heads/master.zip), and drop leadbot_dd-master into the addons folder.
+Navigate to your Garry's Mod addons folder, and then clone the repository:
+```bash
+git clone https://github.com/tbv001/leadbot_dd.git
+```
 
-### Commands/Convars
+## Commands
 
- - leadbot_add [1-128]
- - leadbot_kick _[name/all]_
- - leadbot_quota _[0-128]
- - leadbot_strategy _[0/1]_
+- dd_bot_add [name]: Adds a bot to the game, with a custom name if specified.
+- dd_bot_kick [name]: Kicks all bots from the game, or a specific bot if a name is specified.
+- dd_bot_generatenavmesh: Generates a quick, cheap navmesh for the current map, requires sv_cheats 1.
+- dd_bot_aim_speed_mult [0-1]: Multiplies the bot's aim speed by the given value.
+- dd_bot_slide [0/1]: Enables or disables sliding for bots.
+- dd_bot_dive [0/1]: Enables or disables diving for bots.
+- dd_bot_combat_movement [0/1]: Enables or disables combat movement for bots.
+- dd_bot_use_grenades [0/1]: Enables or disables grenade usage for bots.
+- dd_bot_use_spells [0/1]: Enables or disables spell usage for bots.
+- dd_bot_quota [0-128]: Sets the bot quota.
+
+## Credits
+
+- [LeadKiller](https://github.com/LeadKiller): Original LeadBot author.
+- [And other LeadBot contributors.](https://github.com/LeadKiller/leadbot/graphs/contributors)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/tbv001/leadbot_dd/blob/master/LICENSE) file for details.

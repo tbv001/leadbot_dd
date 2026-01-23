@@ -36,10 +36,6 @@ function ENT:Initialize()
 	self.NextSlideTime = 0
 	self.CurSlideTime = 0
 	self.NextNadeThrowTime = 0
-
-	if LeadBot.AddControllerOverride then
-		LeadBot.AddControllerOverride(self)
-	end
 end
 
 function ENT:ChasePos()
@@ -83,7 +79,6 @@ function ENT:RunBehaviour()
 			self:ChasePos()
 		end
 
-		coroutine.wait(1)
 		coroutine.yield()
 	end
 end

@@ -1,11 +1,4 @@
 local M_Player = FindMetaTable("Player")
-
--- https://github.com/Necrossin/darkestdays/blob/master/gamemode/obj_player_extend.lua#L165
-function RunningCheck(bot)
-    return M_Player.IsRunning(bot)
-end
-
--- https://github.com/Necrossin/darkestdays/blob/master/gamemode/animations.lua
 local M_Entity = FindMetaTable("Entity")
 local P_AnimRestartGesture = M_Player.AnimRestartGesture
 local P_AnimRestartMainSequence = M_Player.AnimRestartMainSequence
@@ -22,6 +15,12 @@ local M_Vector = FindMetaTable("Vector")
 local V_Length2DSqr = M_Vector.Length2DSqr
 local V_LengthSqr = M_Vector.LengthSqr
 
+-- https://github.com/Necrossin/darkestdays/blob/master/gamemode/obj_player_extend.lua#L165
+function RunningCheck(bot)
+    return M_Player.IsRunning(bot)
+end
+
+-- https://github.com/Necrossin/darkestdays/blob/master/gamemode/animations.lua
 function CalcMainActivityBots( pl, velocity )
     if pl:IsBot() then
         pt = E_GetTable(pl)
