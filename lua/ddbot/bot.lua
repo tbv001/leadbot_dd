@@ -783,7 +783,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     -- Break props and func_breakables
-    if not IsValid(controller.Target) then
+    if not IsValid(controller.Target) and controller.NextPropCheck < CurTime() then
+        controller.NextPropCheck = CurTime() + 0.1
         local propsInRadius = ents.FindInSphere(botPos, 100)
         local closestDist = math.huge
         local closestProp

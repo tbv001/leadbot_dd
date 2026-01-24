@@ -37,7 +37,7 @@ function ENT:Initialize()
 	self.CurSlideTime = 0
 	self.NextNadeThrowTime = 0
 	self.ForceShoot = false
-	self.TargettingProp = false
+	self.NextPropCheck = 0
 end
 
 function ENT:ChasePos()
