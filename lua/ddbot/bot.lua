@@ -791,7 +791,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         if ply == bot or not ply:Alive() then continue end
         
         local isEnemy = not isTeamPlay or ply:Team() ~= bot:Team()
-        local isTargetable = (ply:IsPlayer() and isEnemy) or ply:IsNPC()
+        local isTargetable = ply:IsPlayer() and isEnemy
         
         if isTargetable then
             local inRange = ply:GetPos():DistToSqr(botPos) < 2250000
