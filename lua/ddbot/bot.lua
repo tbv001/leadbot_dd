@@ -3,7 +3,6 @@ include("ddbot/shared.lua")
 local DDBot = {}
 local isTeamPlay = false
 local entityLoaded = false
-local aimSpeedMult = 1
 local nextQuotaCheck = 0
 local objective
 local gameType
@@ -11,7 +10,8 @@ local doorEnabled
 local cachedPrimaries, cachedSecondaries
 local cachedSpells, cachedPerks, cachedBuilds
 local sortRefPos
-local nextConVarCheck = 0
+local cv_QuotaVal = 0
+local cv_AimSpeedMult = 1
 local cv_SlideEnabled = true
 local cv_DiveEnabled = true
 local cv_CombatMovementEnabled = true
@@ -106,7 +106,15 @@ local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHI
 function DDBot.Init()
     isTeamPlay = GAMEMODE:GetGametype() ~= "ffa"
     gameType = GAMEMODE:GetGametype()
-    aimSpeedMult = cv_AimSpeedMult:GetFloat()
+    
+    cv_QuotaVal = cv_Quota:GetInt()
+    cv_AimSpeedMult = cv_AimSpeedMult:GetFloat()
+    cv_SlideEnabled = cv_Slide:GetBool()
+    cv_DiveEnabled = cv_Dive:GetBool()
+    cv_CombatMovementEnabled = cv_CombatMovement:GetBool()
+    cv_CanUseGrenadesEnabled = cv_CanUseGrenades:GetBool()
+    cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
+    cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -531,16 +539,6 @@ function DDBot.Think()
         DDBot.Init()
     end
 
-    if nextConVarCheck < curTime then
-        nextConVarCheck = curTime + 1
-        cv_SlideEnabled = cv_Slide:GetBool()
-        cv_DiveEnabled = cv_Dive:GetBool()
-        cv_CombatMovementEnabled = cv_CombatMovement:GetBool()
-        cv_CanUseGrenadesEnabled = cv_CanUseGrenades:GetBool()
-        cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
-        cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
-    end
-
     for _, bot in player.Iterator() do
         if bot:IsBot() then
             if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < curTime then
@@ -561,7 +559,7 @@ function DDBot.Think()
         nextQuotaCheck = curTime + 1
 
         local bots = {}
-        local quota = cv_Quota:GetInt()
+        local quota = cv_QuotaVal
         local humans = #player.GetHumans()
         local target = math.max(0, quota - humans)
 
@@ -1066,7 +1064,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     controller.goalPos = goalpos
 
     -- Eyesight
-    local lerp = FrameTime() * (8 * aimSpeedMult)
+    local lerp = FrameTime() * (8 * cv_AimSpeedMult)
     local lerpc = FrameTime() * 8
 
     local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
@@ -1126,10 +1124,37 @@ end
     ConVar Change Callbacks
 ----------------------------]]--
 
-cvars.AddChangeCallback("dd_bot_aim_speed_mult", function(convar_name, value_old, value_new)
-    aimSpeedMult = tonumber(value_new)
+cvars.AddChangeCallback("dd_bot_quota", function(convar_name, value_old, value_new)
+    cv_QuotaVal = tonumber(value_new)
 end)
 
+cvars.AddChangeCallback("dd_bot_aim_speed_mult", function(convar_name, value_old, value_new)
+    cv_AimSpeedMult = tonumber(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_slide", function(convar_name, value_old, value_new)
+    cv_SlideEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_dive", function(convar_name, value_old, value_new)
+    cv_DiveEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_combat_movement", function(convar_name, value_old, value_new)
+    cv_CombatMovementEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_use_grenades", function(convar_name, value_old, value_new)
+    cv_CanUseGrenadesEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_use_spells", function(convar_name, value_old, value_new)
+    cv_CanUseSpellsEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_aim_prediction", function(convar_name, value_old, value_new)
+    cv_AimPredictionEnabled = tobool(value_new)
+end)
 
 --[[----------------------------
     Hooks
