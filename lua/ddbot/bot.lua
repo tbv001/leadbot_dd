@@ -681,6 +681,12 @@ function DDBot.PlayerHurt(ply, att, hp, dmg)
     end
 end
 
+function DDBot.PlayerDeath(bot, inflictor, attacker)
+    if bot.ControllerBot then
+        bot.ControllerBot.Target = nil
+    end
+end
+
 function DDBot.StartCommand(bot, cmd)
     local controller = bot.ControllerBot
     if not IsValid(controller) then return end
@@ -1255,13 +1261,13 @@ hook.Add("PlayerDisconnected", "DDBot_PlayerDisconnected", function(bot)
 end)
 
 hook.Add("SetupMove", "DDBot_PlayerMove", function(bot, mv, cmd)
-    if bot:IsBot() then
+    if bot:IsBot() and bot:Alive() then
         DDBot.PlayerMove(bot, cmd, mv)
     end
 end)
 
 hook.Add("StartCommand", "DDBot_StartCommand", function(bot, cmd)
-    if bot:IsBot() then
+    if bot:IsBot() and bot:Alive() then
         DDBot.StartCommand(bot, cmd)
     end
 end)
@@ -1273,6 +1279,12 @@ hook.Add("EntityTakeDamage", "DDBot_EntityTakeDamage", function(ply, dmgi)
 
     if IsValid(ply) and ply:IsPlayer() and ply ~= att then
         DDBot.PlayerHurt(ply, att, hp, dmg)
+    end
+end)
+
+hook.Add("PlayerDeath", "DDBot_PlayerDeath", function(bot, inflictor, attacker)
+    if IsValid(bot) and bot:IsBot() then
+        DDBot.PlayerDeath(bot, inflictor, attacker)
     end
 end)
 
