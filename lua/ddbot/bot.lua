@@ -443,6 +443,32 @@ function DDBot.SortTargets(a, b)
     return a:GetPos():DistToSqr(sortRefPos) < b:GetPos():DistToSqr(sortRefPos)
 end
 
+function DDBot.IsDirClear(bot, dir)
+    if not IsValid(bot) then
+        return false
+    end
+
+    local controller = bot.ControllerBot
+    if not IsValid(controller) then
+        return false
+    end
+
+    local tr = util.TraceHull({
+        start = bot:WorldSpaceCenter(),
+        endpos = bot:WorldSpaceCenter() + dir * 50,
+        mins = Vector(-13, -13, 13),
+        maxs = Vector(13, 13, 13),
+        filter = {bot, controller},
+        mask = MASK_SOLID
+    })
+    return not tr.Hit
+end
+
+
+--[[----------------------------
+    Hook Functions
+----------------------------]]--
+
 function DDBot.PlayerSpawn(bot)
     if not (Spells and Perks and Builds and Weapons) then return end
 
@@ -489,6 +515,7 @@ function DDBot.PlayerSpawn(bot)
 
     if loadoutType == 3 then
         primary = "dd_sparkler"
+        secondary = "dd_wand"
         build = Builds["arcane"]
         bot.Skills["strength"] = 0
         bot.Skills["magic"] = 15
@@ -496,12 +523,15 @@ function DDBot.PlayerSpawn(bot)
     elseif loadoutType == 4 and not zombies then
         local thugOrNot = math.random(5) == 1 and "thug" or "adrenaline"
         primary = "none"
+
         local bList = {"agile", "healthy"}
         build = Builds[bList[math.random(#bList)]]
         perk = thugOrNot
+
         if secondary == "dd_fists" then
             perk = "martialarts"
         end
+
         bot.Skills["strength"] = 15
         bot.Skills["magic"] = 5
         bot.Skills["agility"] = 0
@@ -767,6 +797,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local maxSpeed = 999999
     local inobjective = false
     local reachedDest = false
+    local backingUp = false
     local visibleTargetPos
 
     if not IsValid(controller) then
@@ -963,8 +994,25 @@ function DDBot.PlayerMove(bot, cmd, mv)
         if visibleTargetPos then
             -- Back up if the target is really close
             local backupDist = not zombies and 40000 or 160000
+
             if distance <= backupDist and not melee then
-                mv:SetForwardSpeed(-maxSpeed)
+                local backDir = -bot:GetForward()
+                local leftDir = -bot:GetRight()
+                local rightDir = bot:GetRight()
+
+                if DDBot.IsDirClear(bot, backDir) then
+                    backingUp = true
+                    mv:SetForwardSpeed(-maxSpeed)
+                elseif DDBot.IsDirClear(bot, leftDir) then
+                    backingUp = true
+                    mv:SetSideSpeed(-maxSpeed)
+                elseif DDBot.IsDirClear(bot, rightDir) then
+                    backingUp = true
+                    mv:SetSideSpeed(maxSpeed)
+                else
+                    backingUp = true
+                    mv:SetForwardSpeed(-maxSpeed)
+                end
             end
 
             -- Combat movement (strafing, jumping)
@@ -972,10 +1020,21 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 controller.NextCombatMove = curTime + math.Rand(0.5, 1.5)
 
                 -- Random strafe
-                local r = math.random(3)
-                if r == 1 then controller.CombatStrafeDir = 1
-                elseif r == 2 then controller.CombatStrafeDir = -1
-                else controller.CombatStrafeDir = 0 end
+                local leftClear = DDBot.IsDirClear(bot, -bot:GetRight())
+                local rightClear = DDBot.IsDirClear(bot, bot:GetRight())
+                local strafeDir = 0
+
+                if leftClear and rightClear then
+                    strafeDir = math.random(2) == 1 and 1 or -1
+                elseif leftClear then
+                    strafeDir = -1
+                elseif rightClear then
+                    strafeDir = 1
+                else
+                    strafeDir = math.random(2) == 1 and 1 or -1
+                end
+
+                controller.CombatStrafeDir = strafeDir
 
                 -- Random jump
                 if math.random(5) == 1 then
@@ -1006,7 +1065,11 @@ function DDBot.PlayerMove(bot, cmd, mv)
         return
     end
 
-    if botPos:DistToSqr(controller.PosGen) < 900 then
+    if not visibleTargetPos and IsValid(controller.Target) then
+        visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
+    end
+
+    if botPos:DistToSqr(controller.PosGen) < 900 or (visibleTargetPos and botPos:DistToSqr(controller.PosGen) < 250000 and not melee and not backingUp) then
         mv:SetForwardSpeed(0)
         reachedDest = true
     end
@@ -1015,17 +1078,12 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local cPos = curgoal.pos
     local distSqr = botPos:DistToSqr(cPos)
 
-    if segments[cur_segment + 1] and distSqr < 100 then
+    if segments[cur_segment + 1] and distSqr < 400 then
         controller.cur_segment = controller.cur_segment + 1
         curgoal = segments[controller.cur_segment]
     end
 
     local goalpos = curgoal.pos
-
-    local deltaHeight = math.abs(goalpos.z - botPos.z)
-    if deltaHeight > 18 then
-        controller.NextJump = 0
-    end
 
     -- Stuck logic
     if bot:GetVelocity():Length2DSqr() <= 225 and (not isKothMode or not inobjective) and not reachedDest then
@@ -1051,7 +1109,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     -- Jump
-    if controller.NextJump ~= 0 and curgoal.type > 1 and controller.NextJump < curTime then
+    if controller.NextJump ~= 0 and curgoal.type >= 1 and controller.NextJump < curTime then
         controller.NextJump = 0
     end
 
