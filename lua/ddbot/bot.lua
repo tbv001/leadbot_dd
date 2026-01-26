@@ -97,6 +97,7 @@ local cv_CanUseGrenades = CreateConVar("dd_bot_use_grenades", "1", {FCVAR_ARCHIV
 local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use spells")
 local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bot quota")
 local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
+local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
 
 
 --[[----------------------------
@@ -115,6 +116,7 @@ function DDBot.Init()
     cv_CanUseGrenadesEnabled = cv_CanUseGrenades:GetBool()
     cv_CanUseSpellsEnabled = cv_CanUseSpells:GetBool()
     cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
+    cv_AimSpreadMult = cv_AimSpreadMult:GetFloat()
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -381,11 +383,8 @@ function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetA
     local targetPos = targetAimPos or target:WorldSpaceCenter()
     local targetVel = target:GetVelocity()
     local dist = shootPos:Distance(targetPos)
-    
-    -- t = d / v
     local timeToHit = dist / projectileSpeed
     
-    -- x = x + v * t
     return targetPos + (targetVel * timeToHit)
 end
 
@@ -1098,7 +1097,13 @@ function DDBot.PlayerMove(bot, cmd, mv)
             end
         end
 
-        bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, (aimAtPos - bot:GetShootPos()):Angle()))
+        local targetAng = (aimAtPos - bot:GetShootPos()):Angle()
+
+        if cv_AimSpreadMult > 0 then
+            targetAng = targetAng + Angle(math.Rand(-5, 5), math.Rand(-5, 5), 0) * cv_AimSpreadMult
+        end
+
+        bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, targetAng))
     else
         if isKothMode and inobjective then
             mv:SetForwardSpeed(0)
@@ -1154,6 +1159,10 @@ end)
 
 cvars.AddChangeCallback("dd_bot_aim_prediction", function(convar_name, value_old, value_new)
     cv_AimPredictionEnabled = tobool(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_aim_spread_mult", function(convar_name, value_old, value_new)
+    cv_AimSpreadMult = tonumber(value_new)
 end)
 
 --[[----------------------------
