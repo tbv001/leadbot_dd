@@ -14,7 +14,8 @@ git clone https://github.com/tbv001/ddbot.git
 - dd_bot_add [name]: Adds a bot to the game, with a custom name if specified.
 - dd_bot_kick [name]: Kicks all bots from the game, or a specific bot if a name is specified.
 - dd_bot_generatenavmesh: Generates a quick, cheap navmesh for the current map, requires sv_cheats 1.
-- dd_bot_aim_speed_mult [0-1]: Multiplies the bot's aim speed by the given value.
+- dd_bot_aim_speed_mult [number]: Multiplies the bot's aim speed by the given value.
+- dd_bot_aim_spread_mult [number]: Multiplies the bot's aim spread by the given value.
 - dd_bot_slide [0/1]: Enables or disables sliding for bots.
 - dd_bot_dive [0/1]: Enables or disables diving for bots.
 - dd_bot_combat_movement [0/1]: Enables or disables combat movement for bots.
