@@ -441,7 +441,9 @@ function DDBot.GiveSupport(ply, target)
             continue
         end
 
-        if plyPos:DistToSqr(bot:GetPos()) > 250000 then
+        local tr = util.QuickTrace(bot:EyePos(), ply:EyePos(), {bot, controller})
+        local isVisible = tr.Entity == ply
+        if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then
             continue
         end
 
@@ -455,8 +457,7 @@ function DDBot.GiveSupport(ply, target)
                 controller.LastSegmented = curTime + 5
             end
 
-            local tr = util.QuickTrace(bot:EyePos(), ply:EyePos(), {bot, controller})
-            if tr.Entity == ply then
+            if isVisible then
                 controller.LookAt = (targetCenter - bot:GetShootPos()):Angle()
                 controller.LookAtTime = curTime + 1
             end
