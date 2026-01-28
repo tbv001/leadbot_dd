@@ -16,12 +16,12 @@ local V_Length2DSqr = M_Vector.Length2DSqr
 local V_LengthSqr = M_Vector.LengthSqr
 
 -- https://github.com/Necrossin/darkestdays/blob/master/gamemode/obj_player_extend.lua#L165
-function RunningCheck(bot)
+function DDBot.RunningCheck(bot)
     return M_Player.IsRunning(bot)
 end
 
 -- https://github.com/Necrossin/darkestdays/blob/master/gamemode/animations.lua
-function CalcMainActivityBots( pl, velocity )
+function DDBot.BotAnimations(pl, velocity)
     if pl:IsBot() then
         pt = E_GetTable(pl)
         onground = E_OnGround(pl)

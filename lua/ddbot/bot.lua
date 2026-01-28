@@ -32,7 +32,6 @@ local hook = hook
 
 include("ddbot/shared.lua")
 
-local DDBot = {}
 local isTeamPlay = false
 local entityLoaded = false
 local nextQuotaCheck = 0
@@ -730,7 +729,7 @@ function DDBot.StartCommand(bot, cmd)
     end
 
     -- Slide
-    if cv_SlideEnabled and ((controller.NextSlideTime < curTime and math.random(5) == 1) or controller.CurSlideTime > curTime) and RunningCheck(bot) and not isThug then
+    if cv_SlideEnabled and ((controller.NextSlideTime < curTime and math.random(5) == 1) or controller.CurSlideTime > curTime) and DDBot.RunningCheck(bot) and not isThug then
         if controller.CurSlideTime < curTime then
             controller.CurSlideTime = curTime + math.random(1, 2)
         end
@@ -1332,4 +1331,4 @@ hook.Add("PostCleanupMap", "DDBot_PostCleanupMap", function()
     DDBot.Init()
 end)
 
-hook.Add("CalcMainActivity", "DDBot_CalcMainActivity", CalcMainActivityBots)
+hook.Add("CalcMainActivity", "DDBot_CalcMainActivity", DDBot.BotAnimations)
