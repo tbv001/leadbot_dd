@@ -446,13 +446,12 @@ function DDBot.GiveSupport(ply, target)
             continue
         end
 
-        local tr = util.QuickTrace(bot:EyePos(), ply:EyePos(), {bot, controller})
-        local isVisible = tr.Entity == ply
-        if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then
+        if plyTeam and bot.Team and bot:Team() ~= plyTeam then
             continue
         end
 
-        if plyTeam and bot.Team and bot:Team() ~= plyTeam then
+        local isVisible = bot:VisibleVec(ply:EyePos())
+        if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then
             continue
         end
 
