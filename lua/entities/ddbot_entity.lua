@@ -26,6 +26,7 @@ function ENT:Initialize()
 	self.NextCenter = 0
 	self.LookAt = Vector(0, 0, 0)
 	self.LookAtTime = 0
+	self.ForcedLookAt = false
 	self.goalPos = Vector(0, 0, 0)
 	self.strafeAngle = 0
 	self.nextStuckJump = 0
@@ -41,6 +42,7 @@ function ENT:Initialize()
 	self.CurSlideTime = 0
 	self.NextNadeThrowTime = 0
 	self.ForceShoot = false
+	self.ForceCast = false
 	self.NextPropCheck = 0
 end
 

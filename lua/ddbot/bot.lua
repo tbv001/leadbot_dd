@@ -369,25 +369,27 @@ function DDBot.GetLeader(bot)
     return potentialLeaders[1]
 end
 
-function DDBot.GetClosestEnemy(bot)
+function DDBot.GetClosestPlayer(bot, teammate)
     if not IsValid(bot) then return nil end
 
-    local closestEnemy = nil
+    local closestPlayer = nil
     local closestDist = math.huge
     local botPos = bot:GetPos()
     local botTeam = bot:Team()
 
     for _, ply in player.Iterator() do
-        if ply:Alive() and ply:Team() ~= botTeam then
+        if ply == bot then continue end
+
+        if ply:Alive() and (not teammate and ply:Team() ~= botTeam or teammate and ply:Team() == botTeam) then
             local dist = botPos:DistToSqr(ply:GetPos())
             if dist < closestDist then
                 closestDist = dist
-                closestEnemy = ply
+                closestPlayer = ply
             end
         end
     end
 
-    return closestEnemy
+    return closestPlayer
 end
 
 function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetAimPos)
@@ -512,7 +514,7 @@ function DDBot.PlayerSpawn(bot)
         local tempSpells = table.GetKeys(Spells)
         cachedSpells = {}
         for _, spell in ipairs(tempSpells) do
-            if spell ~= "cure" and spell ~= "barrier" then
+            if spell ~= "barrier" then
                 cachedSpells[#cachedSpells + 1] = spell
             end
         end
@@ -711,6 +713,7 @@ function DDBot.StartCommand(bot, cmd)
     local aboutToThrowNade = cv_CanUseGrenadesEnabled and bot.Skills.agility == 15 and isTargetVisible and controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
     local curSpell = bot.GetCurrentSpell and bot:GetCurrentSpell()
     local isAlreadyAttacking = false
+    local isAlreadyCasting = false
     local isSliding = false
 
     -- Sprint when not casting spells and not about to throw nade
@@ -751,6 +754,23 @@ function DDBot.StartCommand(bot, cmd)
                 local nextAttack2Time = melee and 1 or 2
                 controller.NextAttack2 = curTime + nextAttack2Time
                 controller.NextAttack2Delay = curTime + math.random(5, 10)
+
+                if curSpell:GetClass() == "spell_cure" then
+                    if isTeamPlay then
+                        local closestTeammate = DDBot.GetClosestPlayer(bot, true)
+                        if IsValid(closestTeammate) and bot:VisibleVec(closestTeammate:GetPos()) then
+                            controller.LookAt = closestTeammate:GetPos()
+                        else
+                            controller.LookAt = bot:GetPos()
+                        end
+                    else
+                        controller.LookAt = bot:GetPos()
+                    end
+                    controller.LookAtTime = curTime + 0.1
+                    controller.NextAttack2 = curTime + 0.1
+                    controller.ForcedLookAt = true
+                    controller.ForceCast = true
+                end
             end
 
             local targetCenter = target:WorldSpaceCenter()
@@ -759,6 +779,7 @@ function DDBot.StartCommand(bot, cmd)
                 if inMeleeRange then
                     local attack2 = (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime) and IN_ATTACK2 or 0
                     buttons = buttons + IN_ATTACK + attack2
+                    isAlreadyCasting = attack2 > 0
                     isAlreadyAttacking = true
 
                     if not isUsingMinigun then
@@ -788,6 +809,12 @@ function DDBot.StartCommand(bot, cmd)
             if not isUsingMinigun then
                 controller.NextAttack = curTime + 0.05
             end
+        end
+
+        if not isAlreadyCasting and controller.NextAttack2 > curTime and controller.ForceCast then
+            buttons = buttons + IN_ATTACK2
+        else
+            controller.ForceCast = false
         end
     end
 
@@ -975,7 +1002,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             end
         elseif zombies then
             if bot:IsThug() then
-                local closestEnemy = DDBot.GetClosestEnemy(bot)
+                local closestEnemy = DDBot.GetClosestPlayer(bot, false)
                 if IsValid(closestEnemy) then
                     controller.PosGen = closestEnemy:GetPos()
                     controller.LastSegmented = curTime + 2
@@ -1154,7 +1181,10 @@ function DDBot.PlayerMove(bot, cmd, mv)
         visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
     end
 
-    local lookAtAngle
+    if controller.ForcedLookAt and controller.LookAtTime < curTime then
+        controller.ForcedLookAt = false
+    end
+
     local botShootPos = bot:GetShootPos()
     if IsValid(controller.Target) and (melee and visibleTargetPos or not melee) then
         if isKothMode and inobjective and not melee then
@@ -1188,6 +1218,11 @@ function DDBot.PlayerMove(bot, cmd, mv)
             targetAng = targetAng + Angle(math.Rand(-5, 5), math.Rand(-5, 5), 0) * cv_AimSpreadMult
         end
 
+        if controller.ForcedLookAt and controller.LookAtTime > curTime then
+            targetAng = (controller.LookAt - botShootPos):Angle()
+            lerp = 1
+        end
+
         bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, targetAng))
     else
         if isKothMode and inobjective then
@@ -1198,6 +1233,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 controller.LookAtTime = curTime + math.Rand(0.9, 1.3)
             end
         end
+
+        local lookAtAngle
 
         if controller.LookAtTime > curTime then
             lookAtAngle = (controller.LookAt - botShootPos):Angle()
