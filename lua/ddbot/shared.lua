@@ -1,3 +1,7 @@
+local FindMetaTable = FindMetaTable
+local IsValid = IsValid
+local CurTime = CurTime
+
 local M_Player = FindMetaTable("Player")
 local M_Entity = FindMetaTable("Entity")
 local P_AnimRestartGesture = M_Player.AnimRestartGesture

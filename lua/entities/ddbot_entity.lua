@@ -1,3 +1,9 @@
+local AddCSLuaFile = AddCSLuaFile
+local Vector = Vector
+local Path = Path
+local IsValid = IsValid
+local coroutine = coroutine
+
 if SERVER then AddCSLuaFile() end
 
 ENT.Base = "base_nextbot"
@@ -7,7 +13,7 @@ function ENT:Initialize()
 	if CLIENT then return end
 
 	self:SetModel("models/player.mdl")
-	self:SetNoDraw(!GetConVar("developer"):GetBool())
+	self:SetNoDraw(true)
 	self:SetSolid(SOLID_NONE)
 
 	self.PosGen = nil
@@ -19,7 +25,7 @@ function ENT:Initialize()
 	self.LastSegmented = 0
 	self.ForgetTarget = 0
 	self.NextCenter = 0
-	self.LookAt = Angle(0, 0, 0)
+	self.LookAt = Vector(0, 0, 0)
 	self.LookAtTime = 0
 	self.goalPos = Vector(0, 0, 0)
 	self.strafeAngle = 0
@@ -43,11 +49,42 @@ function ENT:ChasePos()
 	self.P = Path("Follow")
 	self.P:SetMinLookAheadDistance(300)
 	self.P:SetGoalTolerance(20)
-	self.P:Compute(self, self.PosGen)
+	self.P:Compute(self, self.PosGen, function(area, fromArea, ladder, elevator, length) 
+		if (not IsValid(fromArea)) then
+			return 0
+		else
+			if (not self.loco:IsAreaTraversable(area)) then
+				return -1
+			end
 
-	if !self.P:IsValid() then return end
+			local dist = 0
 
-	while self.P:IsValid() do
+			if (IsValid(ladder)) then
+				dist = ladder:GetLength()
+			elseif (length > 0) then
+				dist = length
+			else
+				dist = (area:GetCenter() - fromArea:GetCenter()):GetLength()
+			end
+
+			local cost = dist + fromArea:GetCostSoFar()
+
+			local deltaZ = fromArea:ComputeAdjacentConnectionHeightChange(area)
+			if (deltaZ >= self.loco:GetStepHeight()) then
+				if (deltaZ >= self.loco:GetMaxJumpHeight()) then
+					return -1
+				end
+			elseif (deltaZ < -self.loco:GetDeathDropHeight()) then
+				return -1
+			end
+
+			return cost
+		end
+	end)
+
+	if not IsValid(self.P) then return end
+
+	while IsValid(self.P) do
 		if self.PosGen then
 			self.P:Compute(self, self.PosGen)
 			self.cur_segment = 2
