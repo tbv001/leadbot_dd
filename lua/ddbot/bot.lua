@@ -864,6 +864,8 @@ end
 function DDBot.PlayerMove(bot, cmd, mv)
     local controller = bot.ControllerBot
     local maxSpeed = 999999
+    local resultingForwardSpeed = 0
+    local resultingSideSpeed = 0
     local inobjective = false
     local reachedDest = false
     local backingUp = false
@@ -894,7 +896,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         controller:SetAngles(botEyeAngles)
     end
 
-    mv:SetForwardSpeed(maxSpeed)
+    resultingForwardSpeed = maxSpeed
 
     local zombies = gameType == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
@@ -1072,14 +1074,14 @@ function DDBot.PlayerMove(bot, cmd, mv)
             if distance <= backupDist and not melee then
                 if not backIsClear then
                     if leftIsClear then
-                        mv:SetSideSpeed(-maxSpeed)
+                        resultingSideSpeed = -maxSpeed
                     elseif rightIsClear then
-                        mv:SetSideSpeed(maxSpeed)
+                        resultingSideSpeed = maxSpeed
                     end
                 end
 
                 backingUp = true
-                mv:SetForwardSpeed(-maxSpeed)
+                resultingForwardSpeed = -maxSpeed
             end
 
             local botSideSpeed = mv:GetSideSpeed()
@@ -1089,7 +1091,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 controller.NextCombatMove = curTime + math.Rand(0.5, 1.5)
 
                 -- Random strafe
-                local strafeDir
+                local strafeDir = 0
 
                 if leftIsClear and rightIsClear then
                     strafeDir = math.random(2) == 1 and 1 or -1
@@ -1097,8 +1099,6 @@ function DDBot.PlayerMove(bot, cmd, mv)
                     strafeDir = -1
                 elseif rightIsClear then
                     strafeDir = 1
-                else
-                    strafeDir = math.random(2) == 1 and 1 or -1
                 end
 
                 controller.CombatStrafeDir = strafeDir
@@ -1110,7 +1110,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             end
 
             if controller.CombatStrafeDir ~= 0 and not melee and not backingUp then
-                mv:SetSideSpeed(controller.CombatStrafeDir * maxSpeed)
+                resultingSideSpeed = controller.CombatStrafeDir * maxSpeed
             end
         end
     end
@@ -1137,7 +1137,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     if botPos:DistToSqr(controller.PosGen) < 900 or (visibleTargetPos and botPos:DistToSqr(controller.PosGen) < 250000 and not melee and not backingUp) then
-        mv:SetForwardSpeed(0)
+        resultingForwardSpeed = 0
         reachedDest = true
     end
 
@@ -1167,11 +1167,11 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     if controller.NextCenter > curTime then
         if controller.strafeAngle == 1 then
-            mv:SetSideSpeed(maxSpeed)
+            resultingSideSpeed = maxSpeed
         elseif controller.strafeAngle == 2 then
-            mv:SetSideSpeed(-maxSpeed)
+            resultingSideSpeed = -maxSpeed
         else
-            mv:SetForwardSpeed(-maxSpeed)
+            resultingForwardSpeed = 0
         end
     end
 
@@ -1207,7 +1207,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local botShootPos = bot:GetShootPos()
     if IsValid(controller.Target) and (melee and visibleTargetPos or not melee) then
         if isKothMode and inobjective and not melee then
-            mv:SetForwardSpeed(0)
+            resultingForwardSpeed = 0
         end
 
         local aimAtPos = visibleTargetPos or controller.Target:WorldSpaceCenter()
@@ -1245,7 +1245,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, targetAng))
     else
         if isKothMode and inobjective then
-            mv:SetForwardSpeed(0)
+            resultingForwardSpeed = 0
 
             if controller.LookAtTime < curTime then
                 local vectorRand = VectorRand()
@@ -1269,6 +1269,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
             bot:SetEyeAngles(Angle(ang.p, ang.y, 0))
         end
     end
+
+    mv:SetForwardSpeed(resultingForwardSpeed)
+    mv:SetSideSpeed(resultingSideSpeed)
 end
 
 
