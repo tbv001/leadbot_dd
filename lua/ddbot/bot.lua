@@ -1167,7 +1167,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local goalpos = curgoal.pos
 
     -- Stuck logic
-    if bot:GetVelocity():Length2DSqr() <= 225 and not inobjective and not reachedDest then
+    if bot:GetVelocity():Length2DSqr() <= 900 and not inobjective and not reachedDest then
         if controller.NextCenter < curTime then
             controller.strafeAngle = ((controller.strafeAngle == 1 and 2) or 1)
             controller.NextCenter = curTime + math.Rand(0.3, 0.65)
