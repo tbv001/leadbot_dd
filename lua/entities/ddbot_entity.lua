@@ -48,6 +48,7 @@ function ENT:Initialize()
 	self.StuckTime = 0
 	self.StuckStrafeDir = 1
 	self.NextStuckStrafe = 0
+	self.CurrentLadder = nil
 end
 
 local function pathGenerator(ent, area, fromArea, ladder, elevator, length)
@@ -62,6 +63,7 @@ local function pathGenerator(ent, area, fromArea, ladder, elevator, length)
 
 		if (IsValid(ladder)) then
 			dist = ladder:GetLength()
+			ent.CurrentLadder = ladder
 		elseif (length > 0) then
 			dist = length
 		else

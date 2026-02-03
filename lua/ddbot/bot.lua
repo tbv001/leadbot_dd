@@ -741,9 +741,10 @@ function DDBot.StartCommand(bot, cmd)
     local isAlreadyAttacking = false
     local isAlreadyCasting = false
     local isSliding = false
+    local isOnLadder = bot:GetMoveType() == MOVETYPE_LADDER
 
     -- Sprint when not casting spells and not about to throw nade
-    if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade then
+    if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade and not isOnLadder then
         buttons = IN_SPEED
     end
 
@@ -844,11 +845,12 @@ function DDBot.StartCommand(bot, cmd)
         end
     end
 
-    if bot:GetMoveType() == MOVETYPE_LADDER then
-        controller.NextJump = 0
+    if isOnLadder then
+        buttons = buttons + IN_FORWARD
+        controller.NextJump = curTime + 1
     end
 
-    if not isSliding then
+    if not isSliding and not isOnLadder then
         if controller.NextDuck > curTime then
             buttons = buttons + IN_DUCK
         elseif controller.NextJump == 0 then
@@ -871,10 +873,14 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local maxSpeed = 999999
     local resultingForwardSpeed = 0
     local resultingSideSpeed = 0
+    local resultingEyeAngle
+    local resultingMoveAngle
     local inobjective = false
     local reachedDest = false
     local backingUp = false
     local combatMovement = false
+    local useAimSpeedMult = false
+    local isOnLadder = bot:GetMoveType() == MOVETYPE_LADDER
     local backClearDist = DDBot.IsDirClear(bot, -bot:GetForward())
     local rightClearDist = DDBot.IsDirClear(bot, bot:GetRight())
     local leftClearDist = DDBot.IsDirClear(bot, -bot:GetRight())
@@ -910,7 +916,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local zombies = gameType == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
 
-    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or not IsValid(controller.Target) or controller.ForgetTarget < curTime or not controller.Target:Alive() or (controller.Target.IsGhosting and controller.Target:IsGhosting()) then
+    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or not IsValid(controller.Target) or not controller.Target:Alive() or (controller.Target.IsGhosting and controller.Target:IsGhosting()) then
         controller.Target = nil
     end
 
@@ -1223,8 +1229,6 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
 
-    mv:SetMoveAngles(mva)
-
     if not visibleTargetPos and IsValid(controller.Target) then
         visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
     end
@@ -1271,7 +1275,8 @@ function DDBot.PlayerMove(bot, cmd, mv)
             lerp = 1
         end
 
-        bot:SetEyeAngles(LerpAngle(lerp, botEyeAngles, targetAng))
+        resultingEyeAngle = targetAng
+        useAimSpeedMult = true
     else
         if inobjective and not backingUp then
             resultingForwardSpeed = 0
@@ -1291,14 +1296,34 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         if lookAtAngle then
-            local ang = LerpAngle(lerpc, botEyeAngles, lookAtAngle)
-            bot:SetEyeAngles(Angle(ang.p, ang.y, 0))
+            resultingEyeAngle = lookAtAngle
         else
-            local ang = LerpAngle(lerpc, botEyeAngles, mva)
-            bot:SetEyeAngles(Angle(ang.p, ang.y, 0))
+            resultingEyeAngle = mva
         end
     end
 
+    if isOnLadder and IsValid(controller.CurrentLadder) then
+        resultingForwardSpeed = maxSpeed
+        resultingSideSpeed = 0
+
+        -- WIP; doesn't work well when top or bottom mesh center is not in the same direction with the ladder
+        local ladder = controller.CurrentLadder
+        local ladderTop = ladder:GetTop()
+        local ladderBottom = ladder:GetBottom()
+        local distToTop = cPos:DistToSqr(ladderTop)
+        local distToBottom = cPos:DistToSqr(ladderBottom)
+        local targetPos = distToTop < distToBottom and ladderBottom or ladderTop
+        local lookAngle = (targetPos - botShootPos):Angle()
+        
+        resultingMoveAngle = lookAngle
+        resultingEyeAngle = lookAngle
+        useAimSpeedMult = false
+    end
+
+    local lerpResult = useAimSpeedMult and lerpc or lerp
+    resultingMoveAngle = resultingMoveAngle or mva
+    bot:SetEyeAngles(LerpAngle(lerpResult, botEyeAngles, resultingEyeAngle))
+    mv:SetMoveAngles(resultingMoveAngle)
     mv:SetForwardSpeed(resultingForwardSpeed)
     mv:SetSideSpeed(resultingSideSpeed)
 end
