@@ -49,6 +49,10 @@ local cv_CombatMovementEnabled = true
 local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
 local cv_AimPredictionEnabled = true
+local groundCheckFractions = {1, 0.75, 0.5, 0.25}
+local groundCheckOffset = Vector(0, 0, 44)
+local dirCheckHullMins = Vector(-13, -13, -13)
+local dirCheckHullMaxs = Vector(13, 13, 13)
 
 
 --[[----------------------------
@@ -477,32 +481,30 @@ function DDBot.IsDirClear(bot, dir)
     local tr = util.TraceHull({
         start = center,
         endpos = endPos,
-        mins = Vector(-13, -13, -13),
-        maxs = Vector(13, 13, 13),
+        mins = dirCheckHullMins,
+        maxs = dirCheckHullMaxs,
         filter = {bot, controller},
         mask = MASK_PLAYERSOLID_BRUSHONLY
     })
 
     local clearDist = dirRange * tr.Fraction
-
-    if clearDist < 20 then
-        return 0
-    end
-
     local botPos = bot:GetPos()
-    local checkPos = botPos + dir * clearDist
-    local groundTrace = util.TraceLine({
-        start = checkPos,
-        endpos = checkPos - Vector(0, 0, 44),
-        filter = {bot, controller},
-        mask = MASK_PLAYERSOLID_BRUSHONLY
-    })
 
-    if not groundTrace.StartSolid and not groundTrace.Hit then
-        return 0
+    for _, frac in ipairs(groundCheckFractions) do
+        local checkPos = botPos + dir * (clearDist * frac)
+        local groundTrace = util.TraceLine({
+            start = checkPos,
+            endpos = checkPos - groundCheckOffset,
+            filter = {bot, controller},
+            mask = MASK_PLAYERSOLID_BRUSHONLY
+        })
+
+        if groundTrace.StartSolid or groundTrace.Hit then
+            return clearDist * frac
+        end
     end
 
-    return clearDist
+    return 0
 end
 
 
