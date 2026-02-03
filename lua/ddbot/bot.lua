@@ -40,7 +40,6 @@ local gameType
 local doorEnabled
 local cachedPrimaries, cachedSecondaries
 local cachedSpells, cachedPerks, cachedBuilds
-local sortRefPos
 local cv_QuotaVal = 0
 local cv_AimSpeedMultVal = 1
 local cv_FOVVal = 100
@@ -460,10 +459,6 @@ function DDBot.GiveSupport(ply, target)
             end
         end
     end
-end
-
-function DDBot.SortTargets(a, b)
-    return a:GetPos():DistToSqr(sortRefPos) < b:GetPos():DistToSqr(sortRefPos)
 end
 
 function DDBot.IsDirClear(bot, dir)
@@ -926,8 +921,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     local targetCount = #targets
     if targetCount > 1 then
-        sortRefPos = botPos
-        table.sort(targets, DDBot.SortTargets)
+        table.sort(targets, function(a, b)
+            return a:GetPos():DistToSqr(botPos) < b:GetPos():DistToSqr(botPos)
+        end)
     end
 
     for i = 1, targetCount do
