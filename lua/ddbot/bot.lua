@@ -138,6 +138,7 @@ local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHI
 local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
 local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
 
+
 --[[----------------------------
     ConVar Change Callbacks
 ----------------------------]]--
@@ -744,6 +745,7 @@ function DDBot.StartCommand(bot, cmd)
     local buttons = 0
     local curTime = CurTime()
     local zombies = gameType == "ts"
+    local botPos = bot:GetPos()
     local botWeapon = bot:GetActiveWeapon()
     local botWeaponValid = IsValid(botWeapon)
     local melee = botWeaponValid and botWeapon.Base == "dd_meleebase"
@@ -804,10 +806,10 @@ function DDBot.StartCommand(bot, cmd)
                         if IsValid(closestTeammate) and bot:VisibleVec(closestTeammate:GetPos()) then
                             controller.LookAt = closestTeammate:GetPos()
                         else
-                            controller.LookAt = bot:GetPos()
+                            controller.LookAt = botPos
                         end
                     else
-                        controller.LookAt = bot:GetPos()
+                        controller.LookAt = botPos
                     end
                     controller.LookAtTime = curTime + 0.1
                     controller.NextAttack2 = curTime + 0.1
@@ -818,7 +820,7 @@ function DDBot.StartCommand(bot, cmd)
 
             local targetCenter = target:WorldSpaceCenter()
             if DDBot.IsPosWithinFOV(bot, targetCenter) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and isTargetVisible then
-                local inMeleeRange = not melee or bot:GetPos():DistToSqr(target:GetPos()) < 10000
+                local inMeleeRange = not melee or botPos:DistToSqr(target:GetPos()) < 10000
                 if inMeleeRange then
                     local attack2 = (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime) and IN_ATTACK2 or 0
                     buttons = buttons + IN_ATTACK + attack2
@@ -1302,6 +1304,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     mv:SetForwardSpeed(resultingForwardSpeed)
     mv:SetSideSpeed(resultingSideSpeed)
 end
+
 
 --[[----------------------------
     Coroutines
