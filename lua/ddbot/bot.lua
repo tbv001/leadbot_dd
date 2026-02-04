@@ -819,7 +819,7 @@ function DDBot.StartCommand(bot, cmd)
             end
 
             local targetCenter = target:WorldSpaceCenter()
-            if DDBot.IsPosWithinFOV(bot, targetCenter) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and isTargetVisible then
+            if (isUsingMinigun or DDBot.IsPosWithinFOV(bot, targetCenter)) and controller.NextAttack < curTime and controller.ShootReactionTime < curTime and (isUsingMinigun or isTargetVisible) then
                 local inMeleeRange = not melee or botPos:DistToSqr(target:GetPos()) < 10000
                 if inMeleeRange then
                     local attack2 = (not isThug and not aboutToThrowNade and controller.NextAttack2 > curTime) and IN_ATTACK2 or 0
@@ -933,6 +933,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     local zombies = gameType == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
+    local isUsingMinigun = IsValid(wep) and wep:GetClass() == "dd_striker"
 
     if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or controller.ForgetTarget < curTime or not IsValid(controller.Target) or not controller.Target:Alive() or (controller.Target.IsGhosting and controller.Target:IsGhosting()) then
         controller.Target = nil
@@ -940,8 +941,10 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     -- Target acquisition
     if controller.PendingTarget then
+        local forgetTargetTime = isUsingMinigun and 1 or 10
+
         controller.Target = controller.PendingTarget
-        controller.ForgetTarget = curTime + 2
+        controller.ForgetTarget = curTime + forgetTargetTime
         controller.ForceShoot = false
         controller.PendingTarget = nil
     end
