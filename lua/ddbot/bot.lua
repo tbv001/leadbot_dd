@@ -56,6 +56,13 @@ local dirCheckHullMaxs = Vector(13, 13, 13)
 local supportQueue = {}
 local tempVector = Vector(0, 0, 0)
 local tempAngle = Angle(0, 0, 0)
+local visTrace1 = { mask = MASK_VISIBLE }
+local visTrace2 = { mask = MASK_VISIBLE }
+local visTrace3 = { mask = MASK_VISIBLE }
+local propTrace = { mask = MASK_SHOT }
+local hullTrace = { mask = MASK_PLAYERSOLID_BRUSHONLY }
+local groundTrace = { mask = MASK_PLAYERSOLID_BRUSHONLY }
+local doorTrace = {}
 
 
 --[[----------------------------
@@ -298,46 +305,38 @@ function DDBot.IsTargetVisible(bot, target, ignore)
 
     -- For props
     if not target:IsPlayer() then
-        local tr = util.TraceLine({
-            start = botEyePos,
-            endpos = targetCenter,
-            filter = ignore,
-            mask = MASK_SHOT
-        })
+        propTrace.start = botEyePos
+        propTrace.endpos = targetCenter
+        propTrace.filter = ignore
+        local tr = util.TraceLine(propTrace)
 
         return tr.Entity == target and targetCenter or nil
     end
 
     local targetEyePos = target:EyePos()
-    local tr = util.TraceLine({
-        start = botEyePos,
-        endpos = targetEyePos,
-        filter = ignore,
-        mask = MASK_VISIBLE
-    })
+    visTrace1.start = botEyePos
+    visTrace1.endpos = targetEyePos
+    visTrace1.filter = ignore
+    local tr = util.TraceLine(visTrace1)
 
     if not tr.Hit then
         return targetEyePos
     end
 
-    local tr2 = util.TraceLine({
-        start = botEyePos,
-        endpos = targetCenter,
-        filter = ignore,
-        mask = MASK_VISIBLE
-    })
+    visTrace2.start = botEyePos
+    visTrace2.endpos = targetCenter
+    visTrace2.filter = ignore
+    local tr2 = util.TraceLine(visTrace2)
 
     if not tr2.Hit then
         return targetCenter
     end
 
     local targetPos = target:GetPos()
-    local tr3 = util.TraceLine({
-        start = botEyePos,
-        endpos = targetPos,
-        filter = ignore,
-        mask = MASK_VISIBLE
-    })
+    visTrace3.start = botEyePos
+    visTrace3.endpos = targetPos
+    visTrace3.filter = ignore
+    local tr3 = util.TraceLine(visTrace3)
 
     if not tr3.Hit then
         return targetPos
@@ -497,14 +496,14 @@ function DDBot.IsDirClear(bot, dir)
     local dirRange = 75
     local center = bot:WorldSpaceCenter()
     local endPos = center + dir * dirRange
-    local tr = util.TraceHull({
-        start = center,
-        endpos = endPos,
-        mins = dirCheckHullMins,
-        maxs = dirCheckHullMaxs,
-        filter = {bot, controller},
-        mask = MASK_PLAYERSOLID_BRUSHONLY
-    })
+    local filter = {bot, controller}
+    
+    hullTrace.start = center
+    hullTrace.endpos = endPos
+    hullTrace.mins = dirCheckHullMins
+    hullTrace.maxs = dirCheckHullMaxs
+    hullTrace.filter = filter
+    local tr = util.TraceHull(hullTrace)
 
     local clearDist = dirRange * tr.Fraction
 
@@ -513,16 +512,14 @@ function DDBot.IsDirClear(bot, dir)
     end
 
     local botPos = bot:GetPos()
-
     local checkPos = botPos + dir * clearDist
-    local groundTrace = util.TraceLine({
-        start = checkPos,
-        endpos = checkPos - groundCheckOffset,
-        filter = {bot, controller},
-        mask = MASK_PLAYERSOLID_BRUSHONLY
-    })
+    
+    groundTrace.start = checkPos
+    groundTrace.endpos = checkPos - groundCheckOffset
+    groundTrace.filter = filter
+    local gTrace = util.TraceLine(groundTrace)
 
-    if not groundTrace.StartSolid and not groundTrace.Hit then
+    if not gTrace.StartSolid and not gTrace.Hit then
         return 0
     end
 
@@ -1353,14 +1350,20 @@ function DDBot.UpdateBots()
         local botPos = bot:GetPos()
         local botTeam = bot:Team()
         local targets = {}
+        local targetDistances = {}
 
         -- Check for targets
         for _, ply in player.Iterator() do
             if ply ~= bot and ply:Alive() then
                 local isEnemy = not isTeamPlay or ply:Team() ~= botTeam
 
-                if isEnemy and ply:GetPos():DistToSqr(botPos) < 2250000 then
-                    targets[#targets + 1] = ply
+                if isEnemy then
+                    local distSqr = ply:GetPos():DistToSqr(botPos)
+                    if distSqr < 2250000 then
+                        local idx = #targets + 1
+                        targets[idx] = ply
+                        targetDistances[ply] = distSqr
+                    end
                 end
             end
             shouldYield()
@@ -1369,14 +1372,15 @@ function DDBot.UpdateBots()
         local targetCount = #targets
         if targetCount > 1 then
             table.sort(targets, function(a, b)
-                return a:GetPos():DistToSqr(botPos) < b:GetPos():DistToSqr(botPos)
+                return targetDistances[a] < targetDistances[b]
             end)
         end
 
+        local currentTargetDistSqr = IsValid(controller.Target) and botPos:DistToSqr(controller.Target:GetPos()) or math.huge
         for i = 1, targetCount do
             local ply = targets[i]
             local isTargetVisible = DDBot.IsTargetVisible(bot, ply, {bot, controller})
-            if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or botPos:DistToSqr(controller.Target:GetPos()) > botPos:DistToSqr(ply:GetPos())) then
+            if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or currentTargetDistSqr > targetDistances[ply]) then
                 controller.PendingTarget = ply
                 break
             end
@@ -1394,7 +1398,8 @@ function DDBot.UpdateBots()
             local closestProp
 
             for _, prop in ipairs(propsInRadius) do
-                if (string.StartsWith(prop:GetClass(), "prop_") or prop:GetClass() == "func_breakable") and prop:Health() > 0 then
+                local propClass = prop:GetClass()
+                if (string.StartsWith(propClass, "prop_") or propClass == "func_breakable") and prop:Health() > 0 then
                     local explodeDamage = prop:GetKeyValues()["ExplodeDamage"]
                     if explodeDamage and tonumber(explodeDamage) > 0 then
                         continue
