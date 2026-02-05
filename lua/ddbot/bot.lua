@@ -631,22 +631,6 @@ function DDBot.Think()
         DDBot.Init()
     end
 
-    for _, bot in player.Iterator() do
-        if bot:IsBot() then
-            if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < curTime then
-                bot:Spawn()
-            end
-
-            if bot:Alive() then
-                local wep = bot:GetActiveWeapon()
-                if IsValid(wep) and wep.Primary then
-                    local ammoty = wep:GetPrimaryAmmoType() or wep.Primary.Ammo
-                    bot:SetAmmo(wep.Primary.DefaultClip, ammoty)
-                end
-            end
-        end
-    end
-
     if nextQuotaCheck < curTime and entityLoaded then
         nextQuotaCheck = curTime + 1
 
@@ -1334,7 +1318,21 @@ function DDBot.UpdateBots()
     end
 
     for _, bot in player.Iterator() do
-        if not bot:IsBot() or not bot:Alive() then continue end
+        if not bot:IsBot() then continue end
+
+        -- Spawn bot if spawn time has passed
+        if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < curTime then
+            bot:Spawn()
+        end
+
+        if not bot:Alive() then continue end
+
+        -- Refill ammo
+        local wep = bot:GetActiveWeapon()
+        if IsValid(wep) and wep.Primary then
+            local ammoty = wep:GetPrimaryAmmoType() or wep.Primary.Ammo
+            bot:SetAmmo(wep.Primary.DefaultClip, ammoty)
+        end
 
         local controller = bot.ControllerBot
         if not IsValid(controller) then continue end
