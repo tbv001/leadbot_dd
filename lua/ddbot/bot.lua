@@ -1204,7 +1204,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     -- Eyesight
     local ft = FrameTime()
-    local lerp = ft * 8 * cv_AimSpeedMultVal
+    local lerp = ft * 16 * cv_AimSpeedMultVal
     local lerpc = ft * 8
 
     local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
