@@ -56,12 +56,9 @@ local dirCheckHullMaxs = Vector(13, 13, 13)
 local supportQueue = {}
 local tempVector = Vector(0, 0, 0)
 local tempAngle = Angle(0, 0, 0)
-local visTrace1 = { mask = MASK_VISIBLE }
-local visTrace2 = { mask = MASK_VISIBLE }
-local visTrace3 = { mask = MASK_VISIBLE }
-local propTrace = { mask = MASK_SHOT }
-local hullTrace = { mask = MASK_PLAYERSOLID_BRUSHONLY }
-local groundTrace = { mask = MASK_PLAYERSOLID_BRUSHONLY }
+local targetVisTrace = {mask = MASK_VISIBLE}
+local propTrace = {mask = MASK_SHOT}
+local dirTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY}
 local doorTrace = {}
 
 
@@ -314,29 +311,29 @@ function DDBot.IsTargetVisible(bot, target, ignore)
     end
 
     local targetEyePos = target:EyePos()
-    visTrace1.start = botEyePos
-    visTrace1.endpos = targetEyePos
-    visTrace1.filter = ignore
-    local tr = util.TraceLine(visTrace1)
+    targetVisTrace.start = botEyePos
+    targetVisTrace.endpos = targetEyePos
+    targetVisTrace.filter = ignore
+    local tr = util.TraceLine(targetVisTrace)
 
     if not tr.Hit then
         return targetEyePos
     end
 
-    visTrace2.start = botEyePos
-    visTrace2.endpos = targetCenter
-    visTrace2.filter = ignore
-    local tr2 = util.TraceLine(visTrace2)
+    targetVisTrace.start = botEyePos
+    targetVisTrace.endpos = targetCenter
+    targetVisTrace.filter = ignore
+    local tr2 = util.TraceLine(targetVisTrace)
 
     if not tr2.Hit then
         return targetCenter
     end
 
     local targetPos = target:GetPos()
-    visTrace3.start = botEyePos
-    visTrace3.endpos = targetPos
-    visTrace3.filter = ignore
-    local tr3 = util.TraceLine(visTrace3)
+    targetVisTrace.start = botEyePos
+    targetVisTrace.endpos = targetPos
+    targetVisTrace.filter = ignore
+    local tr3 = util.TraceLine(targetVisTrace)
 
     if not tr3.Hit then
         return targetPos
@@ -498,12 +495,12 @@ function DDBot.IsDirClear(bot, dir)
     local endPos = center + dir * dirRange
     local filter = {bot, controller}
     
-    hullTrace.start = center
-    hullTrace.endpos = endPos
-    hullTrace.mins = dirCheckHullMins
-    hullTrace.maxs = dirCheckHullMaxs
-    hullTrace.filter = filter
-    local tr = util.TraceHull(hullTrace)
+    dirTrace.start = center
+    dirTrace.endpos = endPos
+    dirTrace.mins = dirCheckHullMins
+    dirTrace.maxs = dirCheckHullMaxs
+    dirTrace.filter = filter
+    local tr = util.TraceHull(dirTrace)
 
     local clearDist = dirRange * tr.Fraction
 
@@ -514,10 +511,10 @@ function DDBot.IsDirClear(bot, dir)
     local botPos = bot:GetPos()
     local checkPos = botPos + dir * clearDist
     
-    groundTrace.start = checkPos
-    groundTrace.endpos = checkPos - groundCheckOffset
-    groundTrace.filter = filter
-    local gTrace = util.TraceLine(groundTrace)
+    dirTrace.start = checkPos
+    dirTrace.endpos = checkPos - groundCheckOffset
+    dirTrace.filter = filter
+    local gTrace = util.TraceLine(dirTrace)
 
     if not gTrace.StartSolid and not gTrace.Hit then
         return 0

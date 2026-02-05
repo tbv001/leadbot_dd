@@ -81,6 +81,8 @@ local function pathGenerator(ent, area, fromArea, ladder, elevator, length)
 				if (deltaZ >= ent.loco:GetMaxJumpHeight()) then
 					return -1
 				end
+
+				cost = cost + 5 * dist
 			elseif (deltaZ < -ent.loco:GetDeathDropHeight()) then
 				return -1
 			end
