@@ -612,8 +612,14 @@ function DDBot.PlayerSpawn(bot)
     local loadoutType = math.random(1, 4)
     local spell1 = cachedSpells[math.random(#cachedSpells)]
     local spell2 = cachedSpells[math.random(#cachedSpells)]
-    while spell2 == spell1 and #cachedSpells > 1 do
-        spell2 = cachedSpells[math.random(#cachedSpells)]
+    if #cachedSpells > 1 then
+        local availableSpells = {}
+        for i = 1, #cachedSpells do
+            if cachedSpells[i] ~= spell1 then
+                availableSpells[#availableSpells + 1] = cachedSpells[i]
+            end
+        end
+        spell2 = availableSpells[math.random(#availableSpells)]
     end
     local perk = cachedPerks[math.random(#cachedPerks)]
     local primary = cachedPrimaries[math.random(#cachedPrimaries)]
