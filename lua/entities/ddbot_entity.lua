@@ -24,6 +24,7 @@ function ENT:Initialize()
 	self.LastSegmented = 0
 	self.ForgetTarget = 0
 	self.LastSeenTarget = 0
+	self.LastKnownTargetPos = nil
 	self.NextCenter = 0
 	self.LookAt = Vector(0, 0, 0)
 	self.LookAtTime = 0

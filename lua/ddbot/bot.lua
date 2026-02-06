@@ -1077,17 +1077,26 @@ function DDBot.PlayerMove(bot, cmd, mv)
             controller.LastSegmented = curTime + 10
         end
     elseif IsValid(controller.Target) then
-        local targetPos = controller.Target:GetPos()
+        if not visibleTargetPos then
+            visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
+        end
+
+        if visibleTargetPos then
+            controller.LastKnownTargetPos = visibleTargetPos
+        end
+
+        local targetPos = visibleTargetPos and controller.Target:GetPos() or controller.LastKnownTargetPos or controller.Target:GetPos()
         local distance = targetPos:DistToSqr(botPos)
+
+        if not visibleTargetPos and controller.LastKnownTargetPos and botPos:DistToSqr(controller.LastKnownTargetPos) < 900 then
+            controller.Target = nil
+            controller.LastKnownTargetPos = nil
+        end
 
         -- Move to our target
         if not bot:IsCarryingFlag() and (not zombies or bot:IsThug()) and (not melee and not inobjective and (not objectivePos or botPos:DistToSqr(objectivePos) > 250000) or melee) then
             controller.PosGen = targetPos
             controller.LastSegmented = curTime + (melee and math.Rand(0.7, 0.9) or math.Rand(1.1, 1.3))
-        end
-
-        if not visibleTargetPos then
-            visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
         end
 
         if visibleTargetPos then
@@ -1261,7 +1270,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             controller.LastSeenTarget = curTime + 1
         end
 
-        local aimAtPos = visibleTargetPos or controller.Target:WorldSpaceCenter()
+        local aimAtPos = visibleTargetPos or controller.LastKnownTargetPos or controller.Target:WorldSpaceCenter()
 
         local wepValid = IsValid(wep)
         if wepValid and cv_AimPredictionEnabled then
