@@ -1355,7 +1355,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         -- local targetAng = (aimAtPos - botShootPos):Angle()
         targetAng = tempVector:Angle()
 
-        if cv_AimSpreadMultVal > 0 then
+        if cv_AimSpreadMultVal > 0 and visibleTargetPos then
             -- targetAng = targetAng + tempAngle * cv_AimSpreadMultVal
             tempAngle:SetUnpacked(math.Rand(-5, 5), math.Rand(-5, 5), 0)
             tempAngle:Mul(cv_AimSpreadMultVal)
