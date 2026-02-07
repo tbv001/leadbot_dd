@@ -1571,8 +1571,11 @@ function DDBot.UpdateBots()
 
     -- Process support queue
     local canSetPos = gameType ~= "koth" and gameType ~= "htf"
-    while #supportQueue > 0 do
+    local queueCount = #supportQueue
+    for i = 1, queueCount do
         local request = table.remove(supportQueue, 1)
+        if not request then break end
+
         local ply = request.ply
         local target = request.target
 
