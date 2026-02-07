@@ -54,6 +54,9 @@ local cv_AimSpreadMultVal = 1
 local groundCheckOffset = Vector(0, 0, 58)
 local supportQueue = {}
 local supportQueueLookup = {}
+local pooledTargets = {}
+local pooledTargetDistances = {}
+local pooledTargetCount = 0
 local tempVector = Vector(0, 0, 0)
 local tempVector1 = Vector(0, 0, 0)
 local tempAngle = Angle(0, 0, 0)
@@ -281,6 +284,8 @@ function DDBot.AddBot(customName)
     bot.ControllerBot = ents.Create("ddbot_entity")
     bot.ControllerBot:Spawn()
     bot.ControllerBot:SetOwner(bot)
+    bot.ControllerBot.TraceFilter[1] = bot
+    bot.ControllerBot.TraceFilter[2] = bot.ControllerBot
     DDBot.AddBotOverride(bot)
     MsgN("[DDBot] Bot '" .. name .. "' added!")
 end
@@ -556,7 +561,7 @@ function DDBot.IsDirClear(bot, dir)
     tempVector:Add(center)
     local endPos = tempVector
 
-    local filter = {bot, controller}
+    local filter = controller.TraceFilter
     
     dirTrace.start = center
     dirTrace.endpos = endPos
@@ -588,6 +593,10 @@ function DDBot.IsDirClear(bot, dir)
     end
 
     return clearDist
+end
+
+function DDBot.SortTargets(a, b)
+    return pooledTargetDistances[a] < pooledTargetDistances[b]
 end
 
 
@@ -803,7 +812,7 @@ function DDBot.StartCommand(bot, cmd)
     local isUsingMinigun = botWeaponValid and botWeapon:GetClass() == "dd_striker"
     local target = controller.Target
     local isTargetValid = IsValid(target)
-    local isTargetVisible = isTargetValid and DDBot.IsTargetVisible(bot, target, {bot, controller})
+    local isTargetVisible = isTargetValid and DDBot.IsTargetVisible(bot, target, controller.TraceFilter)
     local isThug = bot:IsThug()
     local aboutToThrowNade = cv_CanUseGrenadesEnabled and bot.Skills.agility == 15 and isTargetVisible and controller.NextNadeThrowTime < curTime and math.random(5) == 1 and not melee and not isThug
     local curSpell = bot.GetCurrentSpell and bot:GetCurrentSpell()
@@ -949,18 +958,14 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local combatMovement = false
     local useAimSpeedMult = false
     local isOnLadder = bot:GetMoveType() == MOVETYPE_LADDER
-    local backClearDist = DDBot.IsDirClear(bot, -bot:GetForward())
-    local rightClearDist = DDBot.IsDirClear(bot, bot:GetRight())
-    local leftClearDist = DDBot.IsDirClear(bot, -bot:GetRight())
-    local backIsClear = backClearDist >= 100
-    local rightIsClear = rightClearDist >= 100
-    local leftIsClear = leftClearDist >= 100
     local visibleTargetPos
 
     if not IsValid(controller) then
         bot.ControllerBot = ents.Create("ddbot_entity")
         bot.ControllerBot:Spawn()
         bot.ControllerBot:SetOwner(bot)
+        bot.ControllerBot.TraceFilter[1] = bot
+        bot.ControllerBot.TraceFilter[2] = bot.ControllerBot
         controller = bot.ControllerBot
     end
 
@@ -1011,7 +1016,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     end
 
     if doorEnabled then
-        local dt = util.QuickTrace(bot:EyePos(), bot:GetForward() * 45, {bot, controller})
+        local dt = util.QuickTrace(bot:EyePos(), bot:GetForward() * 45, controller.TraceFilter)
 
         if IsValid(dt.Entity) and dt.Entity:GetClass() == "prop_door_rotating" then
             dt.Entity:Fire("OpenAwayFrom", bot, 0)
@@ -1121,7 +1126,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
     elseif IsValid(controller.Target) then
         if not visibleTargetPos then
-            visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
+            visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, controller.TraceFilter)
         end
 
         if visibleTargetPos then
@@ -1144,6 +1149,13 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         if visibleTargetPos then
+            local backClearDist = DDBot.IsDirClear(bot, -bot:GetForward())
+            local rightClearDist = DDBot.IsDirClear(bot, bot:GetRight())
+            local leftClearDist = DDBot.IsDirClear(bot, -bot:GetRight())
+            local backIsClear = backClearDist >= 100
+            local rightIsClear = rightClearDist >= 100
+            local leftIsClear = leftClearDist >= 100
+
             -- Back up if the target is really close
             local backupDist = not zombies and 40000 or 160000
 
@@ -1217,10 +1229,6 @@ function DDBot.PlayerMove(bot, cmd, mv)
         return
     end
 
-    if not visibleTargetPos and IsValid(controller.Target) then
-        visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
-    end
-
     if botPos:DistToSqr(controller.PosGen) < 900 or (visibleTargetPos and not melee and not backingUp) then
         resultingForwardSpeed = 0
         reachedDest = true
@@ -1292,10 +1300,6 @@ function DDBot.PlayerMove(bot, cmd, mv)
     tempVector:Add(bot:GetCurrentViewOffset())
     tempVector:Sub(bot:GetShootPos())
     local mva = tempVector:Angle()
-
-    if not visibleTargetPos and IsValid(controller.Target) then
-        visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
-    end
 
     if controller.ForcedLookAt and controller.LookAtTime < curTime then
         controller.ForcedLookAt = false
@@ -1488,8 +1492,8 @@ function DDBot.UpdateBots()
 
         local botPos = bot:GetPos()
         local botTeam = bot:Team()
-        local targets = {}
-        local targetDistances = {}
+
+        pooledTargetCount = 0
 
         -- Check for targets
         for _, ply in player.Iterator() do
@@ -1499,27 +1503,28 @@ function DDBot.UpdateBots()
                 if isEnemy then
                     local distSqr = ply:GetPos():DistToSqr(botPos)
                     if distSqr < 2250000 then
-                        local idx = #targets + 1
-                        targets[idx] = ply
-                        targetDistances[ply] = distSqr
+                        pooledTargets[pooledTargetCount + 1] = ply
+                        pooledTargetDistances[ply] = distSqr
+                        pooledTargetCount = pooledTargetCount + 1
                     end
                 end
             end
             shouldYield()
         end
 
-        local targetCount = #targets
-        if targetCount > 1 then
-            table.sort(targets, function(a, b)
-                return targetDistances[a] < targetDistances[b]
-            end)
+        for i = pooledTargetCount + 1, #pooledTargets do
+            pooledTargets[i] = nil
+        end
+
+        if pooledTargetCount > 1 then
+            table.sort(pooledTargets, DDBot.SortTargets)
         end
 
         local currentTargetDistSqr = IsValid(controller.Target) and botPos:DistToSqr(controller.Target:GetPos()) or math.huge
-        for i = 1, targetCount do
-            local ply = targets[i]
-            local isTargetVisible = DDBot.IsTargetVisible(bot, ply, {bot, controller})
-            if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or currentTargetDistSqr > targetDistances[ply]) then
+        for i = 1, pooledTargetCount do
+            local ply = pooledTargets[i]
+            local isTargetVisible = DDBot.IsTargetVisible(bot, ply, controller.TraceFilter)
+            if isTargetVisible and (not IsValid(controller.Target) or controller.Target == ply or currentTargetDistSqr > pooledTargetDistances[ply]) then
                 controller.PendingTarget = ply
                 break
             end
@@ -1553,7 +1558,7 @@ function DDBot.UpdateBots()
                 shouldYield()
             end
 
-            if closestProp and DDBot.IsTargetVisible(bot, closestProp, {bot, controller}) then
+            if closestProp and DDBot.IsTargetVisible(bot, closestProp, controller.TraceFilter) then
                 controller.PendingProp = closestProp
             else
                 controller.PendingForceShootOff = true
