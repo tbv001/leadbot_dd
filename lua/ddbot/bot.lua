@@ -990,7 +990,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
     local isUsingMinigun = IsValid(wep) and wep:GetClass() == "dd_striker"
 
-    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or controller.ForgetTarget < curTime or not IsValid(controller.Target) or not controller.Target:Alive() or (controller.Target.IsGhosting and controller.Target:IsGhosting()) then
+    if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or controller.ForgetTarget < curTime or not IsValid(controller.Target) or not controller.Target:Alive() then
         controller.Target = nil
     end
 
