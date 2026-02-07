@@ -992,6 +992,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or controller.ForgetTarget < curTime or not IsValid(controller.Target) or not controller.Target:Alive() then
         controller.Target = nil
+        controller.IsLastKnownTargetPosValid = false
     end
 
     -- Target acquisition
