@@ -16,7 +16,7 @@ function ENT:Initialize()
 	self:SetNoDraw(true)
 	self:SetSolid(SOLID_NONE)
 
-	self.PosGen = nil
+	self.PosGen = Vector(0, 0, 0)
 	self.NextJump = -1
 	self.NextDuck = 0
 	self.cur_segment = 2
@@ -24,7 +24,8 @@ function ENT:Initialize()
 	self.LastSegmented = 0
 	self.ForgetTarget = 0
 	self.LastSeenTarget = 0
-	self.LastKnownTargetPos = nil
+	self.LastKnownTargetPos = Vector(0, 0, 0)
+	self.IsLastKnownTargetPosValid = false
 	self.NextCenter = 0
 	self.LookAt = Vector(0, 0, 0)
 	self.LookAtTime = 0

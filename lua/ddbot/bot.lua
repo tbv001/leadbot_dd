@@ -55,6 +55,7 @@ local groundCheckOffset = Vector(0, 0, 58)
 local supportQueue = {}
 local supportQueueLookup = {}
 local tempVector = Vector(0, 0, 0)
+local tempVector1 = Vector(0, 0, 0)
 local tempAngle = Angle(0, 0, 0)
 local targetVisTrace = {mask = MASK_VISIBLE}
 local propTrace = {mask = MASK_SHOT}
@@ -308,16 +309,22 @@ function DDBot.AddBotOverride(bot)
 end
 
 function DDBot.IsPosWithinFOV(bot, pos)
+    if not IsValid(bot) then return false end
+
     local bPos = bot:GetPos()
-    local diffX = pos.x - bPos.x
-    local diffY = pos.y - bPos.y
-    local diffZ = pos.z - bPos.z
-    local distSqr = diffX * diffX + diffY * diffY + diffZ * diffZ
+    -- local diffX = pos.x - bPos.x
+    -- local diffY = pos.y - bPos.y
+    -- local diffZ = pos.z - bPos.z
+    -- local distSqr = diffX * diffX + diffY * diffY + diffZ * diffZ
+    tempVector:Set(pos)
+    tempVector:Sub(bPos)
+    local distSqr = tempVector:LengthSqr()
     
     if distSqr == 0 then return true end
 
     local aimVec = bot:GetAimVector()
-    local dot = aimVec.x * diffX + aimVec.y * diffY + aimVec.z * diffZ
+    -- local dot = aimVec.x * diffX + aimVec.y * diffY + aimVec.z * diffZ
+    local dot = aimVec:Dot(tempVector)
     local cosVal = cv_FOVVal
 
     return dot >= 0 and dot * dot >= cosVal * cosVal * distSqr
@@ -494,11 +501,16 @@ function DDBot.CalculateAimPrediction(projectileSpeed, shootPos, target, targetA
     if not IsValid(target) then return nil end
     
     local targetPos = targetAimPos or target:WorldSpaceCenter()
-    local targetVel = target:GetVelocity()
+    -- local targetVel = target:GetVelocity()
     local dist = shootPos:Distance(targetPos)
     local timeToHit = dist / projectileSpeed
     
-    return targetPos + (targetVel * timeToHit)
+    -- return targetPos + (targetVel * timeToHit)
+    tempVector:Set(target:GetVelocity())
+    tempVector:Mul(timeToHit)
+    tempVector:Add(targetPos)
+
+    return tempVector
 end
 
 function DDBot.FindRandomSpot(bot)
@@ -537,7 +549,13 @@ function DDBot.IsDirClear(bot, dir)
 
     local dirRange = 75
     local center = bot:WorldSpaceCenter()
-    local endPos = center + dir * dirRange
+    
+    -- local endPos = center + dir * dirRange
+    tempVector:Set(dir)
+    tempVector:Mul(dirRange)
+    tempVector:Add(center)
+    local endPos = tempVector
+
     local filter = {bot, controller}
     
     dirTrace.start = center
@@ -552,10 +570,16 @@ function DDBot.IsDirClear(bot, dir)
     end
 
     local botPos = bot:GetPos()
-    local checkPos = botPos + dir * clearDist
+
+    -- local checkPos = botPos + dir * clearDist
+    tempVector:Set(dir)
+    tempVector:Mul(clearDist)
+    tempVector:Add(botPos)
+    tempVector1:Set(tempVector)
     
-    dirTrace.start = checkPos
-    dirTrace.endpos = checkPos - groundCheckOffset
+    dirTrace.start = tempVector1
+    tempVector:Sub(groundCheckOffset)
+    dirTrace.endpos = tempVector
     dirTrace.filter = filter
     local gTrace = util.TraceLine(dirTrace)
 
@@ -738,16 +762,16 @@ function DDBot.PlayerHurt(ply, att, hp, dmg)
         if not IsValid(target) then
             controller.Target = att
             controller.ForgetTarget = curTime + 2
-            controller.LookAt = attCenter
+            controller.LookAt:Set(attCenter)
             controller.LookAtTime = curTime + 1
         else
             if target == att then
-                controller.LookAt = attCenter
+                controller.LookAt:Set(attCenter)
                 controller.LookAtTime = curTime + 1
             elseif controllerPos:DistToSqr(target:GetPos()) > controllerPos:DistToSqr(att:GetPos()) then
                 controller.Target = att
                 controller.ForgetTarget = curTime + 2
-                controller.LookAt = attCenter
+                controller.LookAt:Set(attCenter)
                 controller.LookAtTime = curTime + 1
             end
         end
@@ -831,12 +855,12 @@ function DDBot.StartCommand(bot, cmd)
                     if isTeamPlay then
                         local closestTeammate = DDBot.GetClosestPlayer(bot, true)
                         if IsValid(closestTeammate) and bot:VisibleVec(closestTeammate:GetPos()) then
-                            controller.LookAt = closestTeammate:GetPos()
+                            controller.LookAt:Set(closestTeammate:GetPos())
                         else
-                            controller.LookAt = botPos
+                            controller.LookAt:Set(botPos)
                         end
                     else
-                        controller.LookAt = botPos
+                        controller.LookAt:Set(botPos)
                     end
                     controller.LookAtTime = curTime + 0.1
                     controller.NextAttack2 = curTime + 0.1
@@ -977,7 +1001,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     -- Prop checking
     if controller.PendingProp then
-        controller.LookAt = controller.PendingProp:WorldSpaceCenter()
+        controller.LookAt:Set(controller.PendingProp:WorldSpaceCenter())
         controller.LookAtTime = curTime + 0.1
         controller.ForceShoot = true
         controller.PendingProp = nil
@@ -1009,7 +1033,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     if not IsValid(controller.Target) and (not controller.PosGen or (not isHtfMode and not isKothMode and botPos:DistToSqr(controller.PosGen) < 1000) or controller.LastSegmented < curTime) then
         if isHtfMode then
             if bot:IsCarryingFlag() then
-                controller.PosGen = DDBot.FindRandomSpot(bot)
+                controller.PosGen:Set(DDBot.FindRandomSpot(bot))
                 controller.LastSegmented = curTime + 8
             else
                 if not IsValid(objective) then
@@ -1023,10 +1047,16 @@ function DDBot.PlayerMove(bot, cmd, mv)
                     if not IsValid(flag:GetCarrier()) then
                         rand = 32
                     end
+                    
+                    -- rand = VectorRand() * rand
+                    -- tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
+                    -- controller.PosGen = flag:GetPos() + tempVector
+                    tempVector:Set(VectorRand())
+                    tempVector:Mul(rand)
+                    tempVector.z = 0
+                    controller.PosGen:Set(flag:GetPos())
+                    controller.PosGen:Add(tempVector)
 
-                    rand = VectorRand() * rand
-                    tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
-                    controller.PosGen = flag:GetPos() + tempVector
                     controller.LastSegmented = curTime + 2
                 end
             end
@@ -1043,10 +1073,16 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 if IsValid(controller.Target) then
                     rand = rand * 1.25
                 end
+                
+                -- rand = VectorRand() * rand
+                -- tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
+                -- controller.PosGen = point_pos + tempVector
+                tempVector:Set(VectorRand())
+                tempVector:Mul(rand)
+                tempVector.z = 0
+                controller.PosGen:Set(point_pos)
+                controller.PosGen:Add(tempVector)
 
-                rand = VectorRand() * rand
-                tempVector.x, tempVector.y, tempVector.z = rand.x, rand.y, 0
-                controller.PosGen = point_pos + tempVector
                 controller.LastSegmented = curTime + 2
             end
         elseif zombies then
@@ -1062,9 +1098,16 @@ function DDBot.PlayerMove(bot, cmd, mv)
             else
                 local leader = DDBot.GetLeader(bot)
                 if IsValid(leader) and leader ~= bot then
-                    local rand = VectorRand()
-                    tempVector.x, tempVector.y, tempVector.z = rand.x * 200, rand.y * 200, 0
-                    controller.PosGen = leader:GetPos() + tempVector
+                    -- local rand = VectorRand()
+                    -- tempVector.x, tempVector.y, tempVector.z = rand.x * 200, rand.y * 200, 0
+                    -- controller.PosGen = leader:GetPos() + tempVector
+                    tempVector:Set(VectorRand())
+                    tempVector:Mul(200)
+                    tempVector.z = 0
+                    
+                    controller.PosGen:Set(leader:GetPos())
+                    controller.PosGen:Add(tempVector)
+
                     controller.LastSegmented = curTime + 2
                 else
                     controller.PosGen = DDBot.FindRandomSpot(bot)
@@ -1073,7 +1116,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             end
         else
             -- Find a random spot on the map, and in 10 seconds do it again!
-            controller.PosGen = DDBot.FindRandomSpot(bot)
+            controller.PosGen:Set(DDBot.FindRandomSpot(bot))
             controller.LastSegmented = curTime + 10
         end
     elseif IsValid(controller.Target) then
@@ -1082,20 +1125,21 @@ function DDBot.PlayerMove(bot, cmd, mv)
         end
 
         if visibleTargetPos then
-            controller.LastKnownTargetPos = visibleTargetPos
+            controller.LastKnownTargetPos:Set(visibleTargetPos)
+            controller.IsLastKnownTargetPosValid = true
         end
 
-        local targetPos = visibleTargetPos and controller.Target:GetPos() or controller.LastKnownTargetPos or controller.Target:GetPos()
+        local targetPos = visibleTargetPos and controller.Target:GetPos() or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:GetPos()
         local distance = targetPos:DistToSqr(botPos)
 
-        if not visibleTargetPos and controller.LastKnownTargetPos and botPos:DistToSqr(controller.LastKnownTargetPos) < 900 then
+        if not visibleTargetPos and controller.IsLastKnownTargetPosValid and botPos:DistToSqr(controller.LastKnownTargetPos) < 900 then
             controller.Target = nil
-            controller.LastKnownTargetPos = nil
+            controller.IsLastKnownTargetPosValid = false
         end
 
         -- Move to our target
         if not bot:IsCarryingFlag() and (not zombies or bot:IsThug()) and (not melee and not inobjective and (not objectivePos or botPos:DistToSqr(objectivePos) > 250000) or melee) then
-            controller.PosGen = targetPos
+            controller.PosGen:Set(targetPos)
             controller.LastSegmented = curTime + (melee and math.Rand(0.7, 0.9) or math.Rand(1.1, 1.3))
         end
 
@@ -1243,7 +1287,11 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local lerp = ft * 16 * cv_AimSpeedMultVal
     local lerpc = ft * 8
 
-    local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
+    -- local mva = ((goalpos + bot:GetCurrentViewOffset()) - bot:GetShootPos()):Angle()
+    tempVector:Set(goalpos)
+    tempVector:Add(bot:GetCurrentViewOffset())
+    tempVector:Sub(bot:GetShootPos())
+    local mva = tempVector:Angle()
 
     if not visibleTargetPos and IsValid(controller.Target) then
         visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, {bot, controller})
@@ -1258,7 +1306,10 @@ function DDBot.PlayerMove(bot, cmd, mv)
 
     if traversingLadder then
         controller.CurrentLadder = curgoal.ladder
-        local targetAng = (goalpos - botShootPos):Angle()
+        -- local targetAng = (goalpos - botShootPos):Angle()
+        tempVector:Set(goalpos)
+        tempVector:Sub(botShootPos)
+        local targetAng = tempVector:Angle()
         resultingEyeAngle = targetAng
         useAimSpeedMult = false
     elseif IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget > curTime) then
@@ -1270,7 +1321,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             controller.LastSeenTarget = curTime + 1
         end
 
-        local aimAtPos = visibleTargetPos or controller.LastKnownTargetPos or controller.Target:WorldSpaceCenter()
+        local aimAtPos = visibleTargetPos or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:WorldSpaceCenter()
 
         local wepValid = IsValid(wep)
         if wepValid and cv_AimPredictionEnabled then
@@ -1291,15 +1342,29 @@ function DDBot.PlayerMove(bot, cmd, mv)
             end
         end
 
-        local targetAng = (aimAtPos - botShootPos):Angle()
+        local targetAng
+        if aimAtPos ~= tempVector then
+            tempVector:Set(aimAtPos)
+        end
+        tempVector:Sub(botShootPos)
+        -- local targetAng = (aimAtPos - botShootPos):Angle()
+        targetAng = tempVector:Angle()
 
         if cv_AimSpreadMultVal > 0 then
-            tempAngle.p, tempAngle.y, tempAngle.r = math.Rand(-5, 5), math.Rand(-5, 5), 0
-            targetAng = targetAng + tempAngle * cv_AimSpreadMultVal
+            -- targetAng = targetAng + tempAngle * cv_AimSpreadMultVal
+            tempAngle:SetUnpacked(math.Rand(-5, 5), math.Rand(-5, 5), 0)
+            tempAngle:Mul(cv_AimSpreadMultVal)
+            targetAng:Add(tempAngle)
         end
 
         if controller.ForcedLookAt and controller.LookAtTime > curTime then
-            targetAng = (controller.LookAt - botShootPos):Angle()
+             if controller.LookAt ~= tempVector then
+                tempVector:Set(controller.LookAt)
+            end
+            tempVector:Sub(botShootPos)
+            -- targetAng = (controller.LookAt - botShootPos):Angle()
+            targetAng = tempVector:Angle()
+            
             lerp = 1
         end
 
@@ -1310,9 +1375,16 @@ function DDBot.PlayerMove(bot, cmd, mv)
             resultingForwardSpeed = 0
 
             if controller.LookAtTime < curTime then
-                local rand = VectorRand()
-                tempVector.x, tempVector.y, tempVector.z = rand.x * 100, rand.y * 100, 0
-                controller.LookAt = bot:EyePos() + tempVector
+                -- local rand = VectorRand()
+                -- tempVector.x, tempVector.y, tempVector.z = rand.x * 100, rand.y * 100, 0
+                -- controller.LookAt = bot:EyePos() + tempVector
+                tempVector:Set(VectorRand())
+                tempVector:Mul(100)
+                tempVector.z = 0
+                tempVector:Add(bot:EyePos())
+                
+                controller.LookAt:Set(tempVector)
+
                 controller.LookAtTime = curTime + math.Rand(0.9, 1.3)
             end
         end
@@ -1320,7 +1392,12 @@ function DDBot.PlayerMove(bot, cmd, mv)
         local lookAtAngle
 
         if controller.LookAtTime > curTime then
-            lookAtAngle = (controller.LookAt - botShootPos):Angle()
+             if controller.LookAt ~= tempVector then
+                tempVector:Set(controller.LookAt)
+            end
+            tempVector:Sub(botShootPos)
+            -- lookAtAngle = (controller.LookAt - botShootPos):Angle()
+            lookAtAngle = tempVector:Angle()
         end
 
         if lookAtAngle then
@@ -1339,11 +1416,20 @@ function DDBot.PlayerMove(bot, cmd, mv)
         local ladderBottom = ladder:GetBottom()
         local distToTop = cPos:DistToSqr(ladderTop)
         local distToBottom = cPos:DistToSqr(ladderBottom)
-        local centerLadderAngle = ((ladderTop + ladderBottom) * 0.5 - botShootPos):Angle()
+        local centerLadderAngle
+        
+        -- local centerLadderAngle = ((ladderTop + ladderBottom) * 0.5 - botShootPos):Angle()
+        tempVector:Set(ladderTop)
+        tempVector:Add(ladderBottom)
+        tempVector:Mul(0.5)
+        tempVector:Sub(botShootPos)
+        
+        centerLadderAngle = tempVector:Angle()
+
         local whichSide = distToTop < distToBottom and -1 or 1
         local yAxis = whichSide * 30
         local zAxis = centerLadderAngle.y + (whichSide == 1 and 180 or 0)
-        tempAngle.p, tempAngle.y, tempAngle.r = yAxis, zAxis, 0
+        tempAngle:SetUnpacked(yAxis, zAxis, 0)
         
         resultingMoveAngle = tempAngle
         resultingEyeAngle = tempAngle
@@ -1504,12 +1590,12 @@ function DDBot.UpdateBots()
 
             if not IsValid(controller.Target) then
                 if canSetPos then
-                    controller.PosGen = targetPos
+                    controller.PosGen:Set(targetPos)
                     controller.LastSegmented = curTime + 5
                 end
 
                 if isVisible then
-                    controller.LookAt = targetCenter
+                    controller.LookAt:Set(targetCenter)
                     controller.LookAtTime = curTime + 1
                 end
             end
