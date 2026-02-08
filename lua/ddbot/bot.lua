@@ -35,7 +35,6 @@ include("ddbot/shared.lua")
 
 local isTeamPlay = false
 local entityLoaded = false
-local nextQuotaCheck = 0
 local objective
 local gameType
 local doorEnabled
@@ -65,10 +64,27 @@ local propTrace = {mask = MASK_SHOT}
 local dirTrace = {mask = MASK_PLAYERSOLID_BRUSHONLY, mins = Vector(-13, -13, -13), maxs = Vector(13, 13, 13)}
 local doorTrace = {}
 local cachedBotNames
+local explosiveCache = {}
 
 
 --[[----------------------------
-    Commands & ConVars
+    ConVars
+----------------------------]]--
+
+local cv_AimSpeedMult = CreateConVar("dd_bot_aim_speed_mult", "1", {FCVAR_ARCHIVE}, "Sets the bot aim speed multiplier")
+local cv_Slide = CreateConVar("dd_bot_slide", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can slide")
+local cv_Dive = CreateConVar("dd_bot_dive", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can dive")
+local cv_CombatMovement = CreateConVar("dd_bot_combat_movement", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use combat movement")
+local cv_CanUseGrenades = CreateConVar("dd_bot_use_grenades", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use grenades")
+local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use spells")
+local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bot quota")
+local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
+local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
+local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
+
+
+--[[----------------------------
+    Commands
 ----------------------------]]--
 
 concommand.Add("dd_bot_add", function(ply, _, args)
@@ -80,7 +96,10 @@ concommand.Add("dd_bot_add", function(ply, _, args)
         return
     end
 
-    DDBot.AddBot(args[1])
+    local bot = DDBot.AddBot(args[1])
+    if IsValid(bot) then
+        cv_Quota:SetInt(math.max(cv_QuotaVal, #player.GetBots() + #player.GetHumans()))
+    end
 end, nil, "Adds a bot, with a custom name if specified")
 
 concommand.Add("dd_bot_kick", function(ply, _, args)
@@ -96,6 +115,7 @@ concommand.Add("dd_bot_kick", function(ply, _, args)
         for k, v in pairs(player.GetBots()) do
             if string.find(v:GetName(), args[1]) then
                 v:Kick()
+                cv_Quota:SetInt(math.max(0, #player.GetBots() + #player.GetHumans() - 1))
                 return
             end
         end
@@ -103,6 +123,7 @@ concommand.Add("dd_bot_kick", function(ply, _, args)
         for k, v in pairs(player.GetBots()) do
             v:Kick()
         end
+        cv_Quota:SetInt(0)
     end
 end, nil, "Kicks all bots, kicks a bot by name if specified")
 
@@ -135,17 +156,6 @@ concommand.Add("dd_bot_generatenavmesh", function(ply, _, args)
 
     ply:ConCommand("nav_generate")
 end, nil, "Generates a cheap navmesh, requires sv_cheats 1")
-
-local cv_AimSpeedMult = CreateConVar("dd_bot_aim_speed_mult", "1", {FCVAR_ARCHIVE}, "Sets the bot aim speed multiplier")
-local cv_Slide = CreateConVar("dd_bot_slide", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can slide")
-local cv_Dive = CreateConVar("dd_bot_dive", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can dive")
-local cv_CombatMovement = CreateConVar("dd_bot_combat_movement", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use combat movement")
-local cv_CanUseGrenades = CreateConVar("dd_bot_use_grenades", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use grenades")
-local cv_CanUseSpells = CreateConVar("dd_bot_use_spells", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use spells")
-local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bot quota")
-local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
-local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
-local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
 
 
 --[[----------------------------
@@ -288,6 +298,8 @@ function DDBot.AddBot(customName)
     bot.ControllerBot.TraceFilter[2] = bot.ControllerBot
     DDBot.AddBotOverride(bot)
     MsgN("[DDBot] Bot '" .. name .. "' added!")
+
+    return bot
 end
 
 function DDBot.AddBotOverride(bot)
@@ -709,41 +721,6 @@ function DDBot.PlayerSpawn(bot)
             build.OnSet(bot)
         end
     end)
-end
-
-function DDBot.Think()
-    local curTime = CurTime()
-
-    if not gameType then
-        DDBot.Init()
-    end
-
-    if nextQuotaCheck < curTime and entityLoaded then
-        nextQuotaCheck = curTime + 1
-
-        local bots = player.GetBots()
-        local numBots = #bots
-        local quota = cv_QuotaVal
-        local humans = #player.GetHumans()
-        local target = quota - humans
-        if target < 0 then target = 0 end
-
-        if humans > 0 then
-            if numBots < target then
-                for i = 1, target - numBots do
-                    DDBot.AddBot()
-                end
-            elseif numBots > target then
-                for i = numBots, numBots - (numBots - target) + 1, -1 do
-                    bots[i]:Kick()
-                end
-            end
-        elseif numBots > 0 then
-            for i = 1, numBots do
-                bots[i]:Kick()
-            end
-        end
-    end
 end
 
 function DDBot.PlayerHurt(ply, att, hp, dmg)
@@ -1458,7 +1435,11 @@ end
 
 local processingLimit = 100
 local curProcessing = 0
-local updateCoroutine = nil
+local generalCoroutine = nil
+local targetsCoroutine = nil
+local propsCoroutine = nil
+local queueCoroutine = nil
+local quotaCoroutine = nil
 
 local function shouldYield()
     curProcessing = curProcessing + 1
@@ -1468,15 +1449,13 @@ local function shouldYield()
     end
 end
 
-function DDBot.UpdateBots()
+function DDBot.UpdateGeneral()
     while true do
-        local curTime = CurTime()
-
         for _, bot in player.Iterator() do
             if not bot:IsBot() then continue end
 
             -- Spawn bot if spawn time has passed
-            if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < curTime then
+            if bot.NextSpawnTime and not bot:Alive() and bot.NextSpawnTime < CurTime() then
                 bot:Spawn()
             end
 
@@ -1488,6 +1467,19 @@ function DDBot.UpdateBots()
                 local ammoty = wep:GetPrimaryAmmoType() or wep.Primary.Ammo
                 bot:SetAmmo(wep.Primary.DefaultClip, ammoty)
             end
+            coroutine.yield()
+        end
+
+        coroutine.yield()
+    end
+end
+
+function DDBot.UpdateTargets()
+    while true do
+        local curTime = CurTime()
+
+        for _, bot in player.Iterator() do
+            if not bot:IsBot() or not bot:Alive() then continue end
 
             local controller = bot.ControllerBot
             if not IsValid(controller) then continue end
@@ -1534,6 +1526,25 @@ function DDBot.UpdateBots()
                 pooledTargets[i] = nil
             end
 
+            shouldYield()
+        end
+
+        coroutine.yield()
+    end
+end
+
+function DDBot.UpdateProps()
+    while true do
+        local curTime = CurTime()
+
+        for _, bot in player.Iterator() do
+            if not bot:IsBot() or not bot:Alive() then continue end
+
+            local controller = bot.ControllerBot
+            if not IsValid(controller) then continue end
+
+            local botPos = bot:GetPos()
+
             -- Prop and breakable checking
             if not IsValid(controller.Target) and controller.NextPropCheck < curTime then
                 controller.NextPropCheck = curTime + 0.1
@@ -1544,18 +1555,26 @@ function DDBot.UpdateBots()
                 local closestDist = math.huge
                 local closestProp
 
-                for _, prop in ipairs(propsInRadius) do
-                    local propClass = prop:GetClass()
-                    if (string.StartsWith(propClass, "prop_") or propClass == "func_breakable") and prop:Health() > 0 then
-                        local explodeDamage = prop:GetKeyValues()["ExplodeDamage"]
-                        if explodeDamage and tonumber(explodeDamage) > 0 then
-                            continue
-                        end
+                for i = 1, #propsInRadius do
+                    local prop = propsInRadius[i]
+                    if not IsValid(prop) then continue end
 
+                    local propClass = prop:GetClass()
+                    if (propClass:sub(1, 5) == "prop_" or propClass == "func_breakable") and prop:Health() > 0 then
                         local dist = botPos:DistToSqr(prop:GetPos())
                         if dist < closestDist then
-                            closestDist = dist
-                            closestProp = prop
+                            local entID = prop:EntIndex()
+                            local explodeDamage = explosiveCache[entID]
+                            if explodeDamage == nil then
+                                local kvs = prop:GetKeyValues()
+                                explodeDamage = tonumber(kvs and kvs["ExplodeDamage"] or 0)
+                                explosiveCache[entID] = explodeDamage
+                            end
+
+                            if explodeDamage <= 0 then
+                                closestDist = dist
+                                closestProp = prop
+                            end
                         end
                     end
                     shouldYield()
@@ -1571,9 +1590,16 @@ function DDBot.UpdateBots()
             shouldYield()
         end
 
-        -- Process support queue
+        coroutine.yield()
+    end
+end
+
+function DDBot.ProcessSupportQueue()
+    while true do
+        local curTime = CurTime()
         local canSetPos = gameType ~= "koth" and gameType ~= "htf"
         local queueCount = #supportQueue
+        
         for i = 1, queueCount do
             local request = table.remove(supportQueue, 1)
             if not request then break end
@@ -1593,22 +1619,21 @@ function DDBot.UpdateBots()
 
                 local controller = bot.ControllerBot
                 if not IsValid(controller) then continue end
+                if IsValid(controller.Target) then continue end
 
                 if plyTeam and bot.Team and bot:Team() ~= plyTeam then continue end
 
                 local isVisible = bot:VisibleVec(ply:EyePos())
                 if plyPos:DistToSqr(bot:GetPos()) > 250000 and not isVisible then continue end
 
-                if not IsValid(controller.Target) then
-                    if canSetPos then
-                        controller.PosGen:Set(targetPos)
-                        controller.LastSegmented = curTime + 5
-                    end
+                if canSetPos then
+                    controller.PosGen:Set(targetPos)
+                    controller.LastSegmented = curTime + 5
+                end
 
-                    if isVisible then
-                        controller.LookAt:Set(targetCenter)
-                        controller.LookAtTime = curTime + 1
-                    end
+                if isVisible then
+                    controller.LookAt:Set(targetCenter)
+                    controller.LookAtTime = curTime + 1
                 end
 
                 shouldYield()
@@ -1617,6 +1642,41 @@ function DDBot.UpdateBots()
             supportQueueLookup[ply:EntIndex()] = nil
 
             shouldYield()
+        end
+
+        coroutine.yield()
+    end
+end
+
+function DDBot.UpdateQuota()
+    while true do
+        if not entityLoaded then
+            coroutine.yield()
+            continue
+        end
+
+        local bots = player.GetBots()
+        local numBots = #bots
+        local numHumans = #player.GetHumans()
+        local target = math.max(0, cv_QuotaVal - numHumans)
+
+        if numHumans == 0 then
+            coroutine.yield()
+            continue
+        end
+
+        if numBots < target then
+            DDBot.AddBot()
+        elseif numBots > target then
+            local botToKick = bots[numBots]
+            if IsValid(botToKick) then
+                botToKick:Kick()
+            end
+        else
+            local nextCheck = CurTime() + 2
+            while CurTime() < nextCheck do
+                coroutine.yield()
+            end
         end
 
         coroutine.yield()
@@ -1663,15 +1723,45 @@ hook.Add("PlayerDeath", "DDBot_PlayerDeath", function(bot, inflictor, attacker)
 end)
 
 hook.Add("Think", "DDBot_Think", function()
-    -- Coroutine
-    if not updateCoroutine or coroutine.status(updateCoroutine) == "dead" then
-        updateCoroutine = coroutine.create(DDBot.UpdateBots)
+    -- General Coroutine
+    if not generalCoroutine or coroutine.status(generalCoroutine) == "dead" then
+        generalCoroutine = coroutine.create(DDBot.UpdateGeneral)
     end
-    if coroutine.status(updateCoroutine) == "suspended" then
-        coroutine.resume(updateCoroutine)
+    if coroutine.status(generalCoroutine) == "suspended" then
+        coroutine.resume(generalCoroutine)
     end
 
-    DDBot.Think()
+    -- Targets Coroutine
+    if not targetsCoroutine or coroutine.status(targetsCoroutine) == "dead" then
+        targetsCoroutine = coroutine.create(DDBot.UpdateTargets)
+    end
+    if coroutine.status(targetsCoroutine) == "suspended" then
+        coroutine.resume(targetsCoroutine)
+    end
+
+    -- Props Coroutine
+    if not propsCoroutine or coroutine.status(propsCoroutine) == "dead" then
+        propsCoroutine = coroutine.create(DDBot.UpdateProps)
+    end
+    if coroutine.status(propsCoroutine) == "suspended" then
+        coroutine.resume(propsCoroutine)
+    end
+
+    -- Queue Coroutine
+    if not queueCoroutine or coroutine.status(queueCoroutine) == "dead" then
+        queueCoroutine = coroutine.create(DDBot.ProcessSupportQueue)
+    end
+    if coroutine.status(queueCoroutine) == "suspended" then
+        coroutine.resume(queueCoroutine)
+    end
+
+    -- Quota Coroutine
+    if not quotaCoroutine or coroutine.status(quotaCoroutine) == "dead" then
+        quotaCoroutine = coroutine.create(DDBot.UpdateQuota)
+    end
+    if coroutine.status(quotaCoroutine) == "suspended" then
+        coroutine.resume(quotaCoroutine)
+    end
 end)
 
 hook.Add("PlayerSpawn", "DDBot_PlayerSpawn", function(bot)
@@ -1682,10 +1772,12 @@ end)
 
 hook.Add("Initialize", "DDBot_Initialize", function()
     entityLoaded = false
+    table.Empty(explosiveCache)
 end)
 
 hook.Add("PreCleanupMap", "DDBot_PreCleanupMap", function()
     entityLoaded = false
+    table.Empty(explosiveCache)
 end)
 
 hook.Add("InitPostEntity", "DDBot_InitPostEntity", function()
