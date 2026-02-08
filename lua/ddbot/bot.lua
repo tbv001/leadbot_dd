@@ -249,11 +249,13 @@ function DDBot.AddBot(customName)
     end
 
     if not navmesh.IsLoaded() then
+        cv_Quota:SetInt(0)
         MsgN("[DDBot] There is no navmesh! Generate one using \"dd_bot_generatenavmesh\"!")
         return
     end
 
     if player.GetCount() == game.MaxPlayers() then
+        cv_Quota:SetInt(game.MaxPlayers())
         MsgN("[DDBot] Player limit reached!")
         return
     end
