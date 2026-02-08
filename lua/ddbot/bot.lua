@@ -96,7 +96,8 @@ concommand.Add("dd_bot_add", function(ply, _, args)
         return
     end
 
-    local bot = DDBot.AddBot(args[1])
+    local name = #args > 0 and table.concat(args, " ") or nil
+    local bot = DDBot.AddBot(name)
     if IsValid(bot) then
         cv_Quota:SetInt(math.max(cv_QuotaVal, #player.GetBots() + #player.GetHumans()))
     end
@@ -111,9 +112,10 @@ concommand.Add("dd_bot_kick", function(ply, _, args)
         return
     end
 
-    if args[1] then
+    local name = #args > 0 and table.concat(args, " ") or nil
+    if name then
         for k, v in pairs(player.GetBots()) do
-            if string.find(v:GetName(), args[1]) then
+            if string.find(v:GetName(), name) then
                 v:Kick()
                 cv_Quota:SetInt(math.max(0, #player.GetBots() + #player.GetHumans() - 1))
                 return
