@@ -732,6 +732,10 @@ function DDBot.PlayerHurt(ply, att, hp, dmg)
         return
     end
 
+    if not att:IsPlayer() and not att:IsBot() and not att:IsNPC() then
+        return
+    end
+
     if isTeamPlay and ply.Team and att.Team and ply:Team() == att:Team() then
         return
     end
