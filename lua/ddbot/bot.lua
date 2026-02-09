@@ -800,20 +800,25 @@ function DDBot.StartCommand(bot, cmd)
     local isAlreadyAttacking = false
     local isAlreadyCasting = false
     local isSliding = false
+    local isOnLadder = bot:GetMoveType() == MOVETYPE_LADDER
 
-    -- Sprint when not casting spells and not about to throw nade
-    if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade then
-        buttons = IN_SPEED
-    end
-
-    -- Slide
-    if cv_SlideEnabled and ((controller.NextSlideTime < curTime and math.random(5) == 1) or controller.CurSlideTime > curTime) and DDBot.RunningCheck(bot) and not isThug then
-        if controller.CurSlideTime < curTime then
-            controller.CurSlideTime = curTime + math.random(1, 2)
+    if isOnLadder then
+        buttons = IN_FORWARD
+    else
+        -- Sprint when not casting spells and not about to throw nade
+        if (not cv_CanUseSpellsEnabled or controller.NextAttack2 < curTime) and not aboutToThrowNade then
+            buttons = IN_SPEED
         end
-        buttons = buttons + IN_DUCK
-        controller.NextSlideTime = curTime + math.random(4, 10)
-        isSliding = true
+
+        -- Slide
+        if cv_SlideEnabled and ((controller.NextSlideTime < curTime and math.random(5) == 1) or controller.CurSlideTime > curTime) and DDBot.RunningCheck(bot) and not isThug then
+            if controller.CurSlideTime < curTime then
+                controller.CurSlideTime = curTime + math.random(1, 2)
+            end
+            buttons = buttons + IN_DUCK
+            controller.NextSlideTime = curTime + math.random(4, 10)
+            isSliding = true
+        end
     end
 
     if botWeaponValid then
@@ -903,7 +908,7 @@ function DDBot.StartCommand(bot, cmd)
         end
     end
 
-    if not isSliding then
+    if not isSliding and not isOnLadder then
         if controller.NextDuck > curTime then
             buttons = buttons + IN_DUCK
         elseif controller.NextJump == 0 then
@@ -964,6 +969,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local zombies = gameType == "ts"
     local melee = IsValid(wep) and wep.Base == "dd_meleebase"
     local isUsingMinigun = IsValid(wep) and wep:GetClass() == "dd_striker"
+    local isOnLadder = bot:GetMoveType() == MOVETYPE_LADDER
 
     if (bot.NextSpawnTime and bot.NextSpawnTime + 1 > curTime) or controller.ForgetTarget < curTime or not IsValid(controller.Target) or not controller.Target:Alive() then
         controller.Target = nil
@@ -1155,7 +1161,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
             local botSideSpeed = mv:GetSideSpeed()
 
             -- Combat movement (strafing, jumping)
-            if cv_CombatMovementEnabled and (controller.NextCombatMove < curTime or (botSideSpeed > 0 and not rightIsClear or botSideSpeed < 0 and not leftIsClear)) then
+            if not isOnLadder and cv_CombatMovementEnabled and (controller.NextCombatMove < curTime or (botSideSpeed > 0 and not rightIsClear or botSideSpeed < 0 and not leftIsClear)) then
                 controller.NextCombatMove = curTime + math.Rand(0.5, 1.5)
 
                 -- Random strafe
@@ -1181,7 +1187,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
                 end
             end
 
-            if controller.CombatStrafeDir ~= 0 and not melee and not backingUp then
+            if not isOnLadder and controller.CombatStrafeDir ~= 0 and not melee and not backingUp then
                 combatMovement = true
                 resultingSideSpeed = controller.CombatStrafeDir * maxSpeed
             end
@@ -1222,7 +1228,7 @@ function DDBot.PlayerMove(bot, cmd, mv)
     local goalpos = curgoal.pos
 
     -- Stuck logic
-    if not inobjective and not reachedDest and not combatMovement then
+    if not isOnLadder and not inobjective and not reachedDest and not combatMovement then
         if controller.NextStuckPosUpdate < curTime then
             local lastStuckPos = controller.LastStuckPos or botPos
             local movedDistSqr = botPos:DistToSqr(lastStuckPos)
@@ -1375,6 +1381,32 @@ function DDBot.PlayerMove(bot, cmd, mv)
             resultingEyeAngle = lookAtAngle
         else
             resultingEyeAngle = mva
+        end
+    end
+
+    if isOnLadder then
+        resultingForwardSpeed = maxSpeed
+        resultingSideSpeed = 0
+        local ladder = curgoal.ladder
+
+        if IsValid(ladder) then
+            tempVector:Set(ladder:GetTop())
+            tempVector:Sub(ladder:GetBottom())
+            local ladderAng = tempVector:Angle()
+
+            tempVector1:Set(goalpos)
+            tempVector1:Sub(botShootPos)
+            local goalAng = tempVector1:Angle()
+            local goalPitch = goalAng.p
+            if goalPitch > 180 then goalPitch = goalPitch - 360 end
+
+            local pitch = math.abs(goalPitch - 45) < math.abs(goalPitch - (-45)) and -45 or 45
+
+            --// TODO: Add 180 to yaw if going down
+            resultingEyeAngle = Angle(pitch, ladderAng.y, 0)
+            resultingMoveAngle = resultingEyeAngle
+        else
+            bot:ExitLadder()
         end
     end
 
