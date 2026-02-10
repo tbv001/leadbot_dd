@@ -655,7 +655,7 @@ function DDBot.PlayerSpawn(bot)
         cachedPerks = {}
         for i = 1, numTempPerks do
             local perk = tempPerks[i]
-            if perk ~= "thug" and perk ~= "crow" and perk ~= "blank" then
+            if perk ~= "thug" and perk ~= "crow" and perk ~= "blank" and perk ~= "transcendence" and perk ~= "martialarts" then
                 cachedPerks[#cachedPerks + 1] = perk
             end
         end
