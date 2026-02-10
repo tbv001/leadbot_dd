@@ -687,6 +687,7 @@ function DDBot.PlayerSpawn(bot)
         primary = "dd_sparkler"
         secondary = "dd_wand"
         build = Builds["arcane"]
+        perk = "transcendence"
         bot.Skills["strength"] = 0
         bot.Skills["magic"] = 15
         bot.Skills["agility"] = 5
