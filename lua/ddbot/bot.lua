@@ -1,29 +1,29 @@
 local include = include
+local math = math
 local Vector = Vector
 local Angle = Angle
+local CreateConVar = CreateConVar
 local concommand = concommand
 local IsValid = IsValid
-local pairs = pairs
+local table = table
 local player = player
+local pairs = pairs
 local string = string
 local GetConVar = GetConVar
 local MsgN = MsgN
 local navmesh = navmesh
-local CreateConVar = CreateConVar
 local cvars = cvars
 local tonumber = tonumber
 local tobool = tobool
-local math = math
 local ents = ents
+local file = file
 local game = game
 local player_manager = player_manager
-local table = table
 local tostring = tostring
 local CurTime = CurTime
 local util = util
 local team = team
 local Color = Color
-local ipairs = ipairs
 local timer = timer
 local VectorRand = VectorRand
 local FrameTime = FrameTime
@@ -641,16 +641,20 @@ function DDBot.PlayerSpawn(bot)
     
     if not cachedSpells then
         local tempSpells = table.GetKeys(Spells)
+        local numTempSpells = #tempSpells
         cachedSpells = {}
-        for _, spell in ipairs(tempSpells) do
+        for i = 1, numTempSpells do
+            local spell = tempSpells[i]
             if spell ~= "telekinesis" and spell ~= "bloodtrap" and spell ~= "cyclonetrap" then
                 cachedSpells[#cachedSpells + 1] = spell
             end
         end
 
         local tempPerks = table.GetKeys(Perks)
+        local numTempPerks = #tempPerks
         cachedPerks = {}
-        for _, perk in ipairs(tempPerks) do
+        for i = 1, numTempPerks do
+            local perk = tempPerks[i]
             if perk ~= "thug" and perk ~= "crow" and perk ~= "blank" then
                 cachedPerks[#cachedPerks + 1] = perk
             end
