@@ -645,7 +645,7 @@ function DDBot.PlayerSpawn(bot)
         cachedSpells = {}
         for i = 1, numTempSpells do
             local spell = tempSpells[i]
-            if spell ~= "telekinesis" and spell ~= "bloodtrap" and spell ~= "cyclonetrap" then
+            if spell ~= "telekinesis" then
                 cachedSpells[#cachedSpells + 1] = spell
             end
         end
@@ -854,7 +854,8 @@ function DDBot.StartCommand(bot, cmd)
                 controller.NextAttack2 = curTime + nextAttack2Time
                 controller.NextAttack2Delay = curTime + math.random(5, 10)
 
-                if curSpell:GetClass() == "spell_cure" then
+                local spellClass = curSpell:GetClass()
+                if spellClass == "spell_cure" then
                     if isTeamPlay then
                         local closestTeammate = DDBot.GetClosestPlayer(bot, true)
                         if IsValid(closestTeammate) and bot:VisibleVec(closestTeammate:GetPos()) then
@@ -865,6 +866,19 @@ function DDBot.StartCommand(bot, cmd)
                     else
                         controller.LookAt:Set(botPos)
                     end
+                    controller.LookAtTime = curTime + 0.1
+                    controller.NextAttack2 = curTime + 0.1
+                    controller.ForcedLookAt = true
+                    controller.ForceCast = true
+                elseif spellClass == "spell_cyclonetrap" then
+                    controller.LookAt:Set(botPos)
+                    controller.LookAtTime = curTime + 0.1
+                    controller.NextAttack2 = curTime + 0.1
+                    controller.ForcedLookAt = true
+                    controller.ForceCast = true
+                elseif spellClass == "spell_bloodtrap" then
+                    controller.LookAt:Set(botPos)
+                    controller.LookAt.z = controller.LookAt.z + 1000
                     controller.LookAtTime = curTime + 0.1
                     controller.NextAttack2 = curTime + 0.1
                     controller.ForcedLookAt = true
