@@ -1717,18 +1717,24 @@ hook.Add("PlayerDisconnected", "DDBot_PlayerDisconnected", function(bot)
 end)
 
 hook.Add("SetupMove", "DDBot_PlayerMove", function(bot, mv, cmd)
+    if ENDROUND then return end
+
     if bot:IsBot() and bot:Alive() then
         DDBot.PlayerMove(bot, cmd, mv)
     end
 end)
 
 hook.Add("StartCommand", "DDBot_StartCommand", function(bot, cmd)
+    if ENDROUND then return end
+
     if bot:IsBot() and bot:Alive() then
         DDBot.StartCommand(bot, cmd)
     end
 end)
 
 hook.Add("EntityTakeDamage", "DDBot_EntityTakeDamage", function(ply, dmgi)
+    if ENDROUND then return end
+
     local att = dmgi:GetAttacker()
     local hp = ply:Health()
     local dmg = dmgi:GetDamage()
@@ -1745,6 +1751,8 @@ hook.Add("PlayerDeath", "DDBot_PlayerDeath", function(bot, inflictor, attacker)
 end)
 
 hook.Add("Think", "DDBot_Think", function()
+    if ENDROUND then return end
+
     -- General Coroutine
     if not generalCoroutine or coroutine.status(generalCoroutine) == "dead" then
         generalCoroutine = coroutine.create(DDBot.UpdateGeneral)
