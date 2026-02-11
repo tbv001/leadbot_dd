@@ -629,7 +629,7 @@ function DDBot.PlayerSpawn(bot)
         cachedPrimaries = {}
         cachedSecondaries = {}
         for class, wep in pairs(Weapons) do
-            if class == "empty" or class == "dd_sparkler" then continue end
+            if class == "empty" or class == "dd_sparkler" or class == "dd_wand" then continue end
 
             if wep.Melee then
                 cachedSecondaries[#cachedSecondaries + 1] = class
