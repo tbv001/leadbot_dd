@@ -867,10 +867,6 @@ function DDBot.StartCommand(bot, cmd)
 
         if cv_CanUseSpellsEnabled and controller.NextAttack2Delay < curTime and (curSpell and bot.CanCast and bot:CanCast(curSpell)) and (bot.IsMagicLoadout or math.random(3) == 1) and not isUsingMinigun and not isThug and not isOnLadder then
             local nextAttack2Delay = bot.IsMagicLoadout and math.random(1, 3) or math.random(5, 10)
-
-            if bot.IsMagicLoadout then
-                print("Magic Loadout")
-            end
             
             if isTargetValid then
                 local nextAttack2Time = melee and 1 or bot.IsMagicLoadout and 3 or 2
