@@ -1248,9 +1248,9 @@ function DDBot.PlayerMove(bot, cmd, mv)
             local leftIsClear = leftClearDist >= 100
 
             -- Back up if the target is really close
-            local backupDist = not zombies and 40000 or 160000
+            local backupDist = not zombies and not melee and 40000 or melee and 2500 or 160000
 
-            if distance <= backupDist and not melee then
+            if distance <= backupDist then
                 if not backIsClear then
                     if leftIsClear then
                         resultingSideSpeed = -maxSpeed
