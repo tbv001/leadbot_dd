@@ -1248,15 +1248,18 @@ function DDBot.PlayerMove(bot, cmd, mv)
             visibleTargetPos = DDBot.IsTargetVisible(bot, controller.Target, controller.TraceFilter)
         end
 
-        if visibleTargetPos then
-            controller.LastKnownTargetPos:Set(visibleTargetPos)
-            controller.IsLastKnownTargetPosValid = true
-        end
-
         local targetPos = visibleTargetPos and controller.Target:GetPos() or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:GetPos()
         local distance = targetPos:DistToSqr(botPos)
 
-        if not visibleTargetPos and controller.IsLastKnownTargetPosValid and botPos:DistToSqr(controller.LastKnownTargetPos) < 900 then
+        if visibleTargetPos then
+            controller.LastKnownTargetPos:Set(visibleTargetPos)
+            controller.LastSeenTarget = curTime + 1
+            controller.IsLastKnownTargetPosValid = true
+        elseif controller.LastSeenTarget > curTime then
+            controller.LastKnownTargetPos:Set(targetPos)
+        end
+
+        if not visibleTargetPos and controller.IsLastKnownTargetPosValid and controller.LastSeenTarget < curTime and botPos:DistToSqr(controller.LastKnownTargetPos) < 900 then
             controller.Target = nil
             controller.IsLastKnownTargetPosValid = false
         end
@@ -1429,10 +1432,6 @@ function DDBot.PlayerMove(bot, cmd, mv)
     if IsValid(controller.Target) and (isUsingMinigun or visibleTargetPos or controller.LastSeenTarget > curTime) then
         if inobjective and not melee then
             resultingForwardSpeed = 0
-        end
-
-        if visibleTargetPos then
-            controller.LastSeenTarget = curTime + 1
         end
 
         local aimAtPos = visibleTargetPos or (controller.IsLastKnownTargetPosValid and controller.LastKnownTargetPos) or controller.Target:WorldSpaceCenter()
