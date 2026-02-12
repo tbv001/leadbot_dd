@@ -51,6 +51,8 @@ local cv_CanUseGrenadesEnabled = true
 local cv_CanUseSpellsEnabled = true
 local cv_AimPredictionEnabled = true
 local cv_AimSpreadMultVal = 1
+local cv_ProcessingLimitVal = 100
+local cv_LoadoutTypeVal = 0
 local groundCheckOffset = Vector(0, 0, 58)
 local supportQueue = {}
 local supportQueueLookup = {}
@@ -83,6 +85,8 @@ local cv_Quota = CreateConVar("dd_bot_quota", "0", {FCVAR_ARCHIVE}, "Sets the bo
 local cv_AimPrediction = CreateConVar("dd_bot_aim_prediction", "1", {FCVAR_ARCHIVE}, "Sets whether or not bots can use aim prediction")
 local cv_AimSpreadMult = CreateConVar("dd_bot_aim_spread_mult", "1.0", {FCVAR_ARCHIVE}, "Sets the bot aim spread multiplier")
 local cv_FOV = CreateConVar("dd_bot_fov", "100", {FCVAR_ARCHIVE}, "Sets the bot field of view")
+local cv_ProcessingLimit = CreateConVar("dd_bot_processing_limit", "100", {FCVAR_ARCHIVE}, "Sets the bot processing limit per tick")
+local cv_LoadoutType = CreateConVar("dd_bot_loadout_type", "0", {FCVAR_ARCHIVE}, "Sets the bot loadout type (0: random, 1: gun, 2: magic, 3: melee)")
 
 
 --[[----------------------------
@@ -223,6 +227,14 @@ cvars.AddChangeCallback("dd_bot_fov", function(convar_name, value_old, value_new
     cv_FOVVal = math.cos(math.rad(tonumber(value_new) * 0.5))
 end)
 
+cvars.AddChangeCallback("dd_bot_processing_limit", function(convar_name, value_old, value_new)
+    cv_ProcessingLimitVal = tonumber(value_new)
+end)
+
+cvars.AddChangeCallback("dd_bot_loadout_type", function(convar_name, value_old, value_new)
+    cv_LoadoutTypeVal = tonumber(value_new)
+end)
+
 
 --[[----------------------------
     Functions
@@ -242,6 +254,8 @@ function DDBot.Init()
     cv_AimPredictionEnabled = cv_AimPrediction:GetBool()
     cv_AimSpreadMultVal = cv_AimSpreadMult:GetFloat()
     cv_FOVVal = math.cos(math.rad(cv_FOV:GetInt() * 0.5))
+    cv_ProcessingLimitVal = cv_ProcessingLimit:GetInt()
+    cv_LoadoutTypeVal = cv_LoadoutType:GetInt()
 
     if ents.FindByClass("prop_door_rotating")[1] then
         doorEnabled = true
@@ -695,7 +709,17 @@ function DDBot.PlayerSpawn(bot)
         cachedBuilds = table.GetKeys(Builds)
     end
     
-    local loadoutType = math.random(1, 4)
+    local loadoutType
+    if cv_LoadoutTypeVal == 1 then
+        loadoutType = 1
+    elseif cv_LoadoutTypeVal == 2 then
+        loadoutType = 3
+    elseif cv_LoadoutTypeVal == 3 then
+        loadoutType = 4
+    else
+        loadoutType = math.random(1, 4)
+    end
+    
     local spell1 = cachedSpells[math.random(#cachedSpells)]
     local spell2 = cachedSpells[math.random(#cachedSpells)]
     if #cachedSpells > 1 then
@@ -1536,7 +1560,6 @@ end
     Coroutines
 ----------------------------]]--
 
-local processingLimit = 100
 local curProcessing = 0
 local generalCoroutine = nil
 local targetsCoroutine = nil
@@ -1546,7 +1569,7 @@ local quotaCoroutine = nil
 
 local function shouldYield()
     curProcessing = curProcessing + 1
-    if curProcessing >= processingLimit then
+    if curProcessing >= cv_ProcessingLimitVal then
         curProcessing = 0
         coroutine.yield()
     end
