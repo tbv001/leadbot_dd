@@ -322,7 +322,7 @@ function DDBot.AddBot(customName)
         end
     end
 
-    local model = table.Random(cachedModels)
+    local model = cachedModels[math.random(#cachedModels)]
     local bot = player.CreateNextBot(name)
 
     if not IsValid(bot) then
@@ -1579,6 +1579,7 @@ function DDBot.UpdateTargets()
                         end
                     end
                 end
+                shouldYield()
             end
 
             if pooledTargetCount > 1 then
