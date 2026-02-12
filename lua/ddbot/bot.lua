@@ -405,7 +405,7 @@ function DDBot.IsTargetVisible(bot, target, ignore)
         return nil
     end
 
-    if botEyePos:DistToSqr(targetCenter) > 2500 then 
+    if botEyePos:DistToSqr(targetCenter) > 10000 then 
         -- Field of view check
         if not DDBot.IsPosWithinFOV(bot, targetCenter) then
             return nil
@@ -719,7 +719,7 @@ function DDBot.PlayerSpawn(bot)
     else
         loadoutType = math.random(1, 4)
     end
-    
+
     local spell1 = cachedSpells[math.random(#cachedSpells)]
     local spell2 = cachedSpells[math.random(#cachedSpells)]
     if #cachedSpells > 1 then
