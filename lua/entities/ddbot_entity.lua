@@ -38,6 +38,7 @@ function ENT:Initialize()
 	self.NextAttack2 = 0
 	self.NextAttack2Delay = 0
 	self.MeleeBlocking = false
+	self.MeleeBlockingCD = 0
 	self.MeleeStateTimer = 0
 	self.NextChangeSpell = 0
 	self.NextDiveTime = 0

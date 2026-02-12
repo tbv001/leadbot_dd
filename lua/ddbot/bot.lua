@@ -952,9 +952,10 @@ function DDBot.StartCommand(bot, cmd)
                 if inMeleeRange then
                     local attackButton = IN_ATTACK
                     if melee and not zombies then
-                        if controller.MeleeStateTimer < curTime and math.random(3) == 1 then
-                            controller.MeleeBlocking = not controller.MeleeBlocking
+                        if controller.MeleeStateTimer < curTime and controller.MeleeBlockingCD < curTime and math.random(3) == 1 then
+                            controller.MeleeBlocking = true
                             controller.MeleeStateTimer = curTime + math.Rand(1, 2)
+                            controller.MeleeBlockingCD = controller.MeleeStateTimer + math.Rand(1, 2)
                         end
 
                         if controller.MeleeBlocking then
